@@ -8,9 +8,6 @@
 # Dependencies
 node_modules/
 
-# Vercel
-.vercel/
-
 # Logs
 *.log
 npm-debug.log*

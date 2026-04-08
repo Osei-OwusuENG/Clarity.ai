@@ -1,4 +1,4 @@
-const popupState = {
+﻿const popupState = {
   popup: null,
   requestId: 0,
   activeText: "",
@@ -229,7 +229,7 @@ function ensurePopup() {
   }
 
   const popup = document.createElement("div");
-  popup.id = "snaplearn-popup";
+  popup.id = "clarity-popup";
   popup.setAttribute("role", "dialog");
   popup.setAttribute("aria-live", "polite");
 
@@ -287,10 +287,10 @@ function renderLoadingState(popup, selectedText, mode) {
   const labels = getExplanationLabels(selectedText, mode);
 
   const statusRow = document.createElement("div");
-  statusRow.className = "snaplearn-status";
+  statusRow.className = "clarity-status";
 
   const text = document.createElement("p");
-  text.className = "snaplearn-message";
+  text.className = "clarity-message";
   text.textContent =
     mode === ELI12_EXPLANATION_MODE
       ? "Simplifying this for a 12-year-old..."
@@ -302,7 +302,7 @@ function renderLoadingState(popup, selectedText, mode) {
   body.append(
     statusRow,
     createLoadingSection(labels.definition),
-    createLoadingSection(labels.usage, "snaplearn-section snaplearn-section--usage")
+    createLoadingSection(labels.usage, "clarity-section clarity-section--usage")
   );
 }
 
@@ -314,7 +314,7 @@ function renderExplanationState(popup, selection, explanation) {
   const labels = getExplanationLabels(selectedText, explanation.mode);
 
   body.appendChild(createSection(labels.definition, explanation.definition));
-  body.appendChild(createSection(labels.usage, explanation.usage, "snaplearn-section snaplearn-section--usage"));
+  body.appendChild(createSection(labels.usage, explanation.usage, "clarity-section clarity-section--usage"));
   appendExplanationActions(actions, selection, explanation, copyText);
 }
 
@@ -325,19 +325,19 @@ function renderErrorState(popup, selectedText, message) {
   const isBackendSetupError = isBackendSetupMessage(message);
 
   const errorMessage = document.createElement("p");
-  errorMessage.className = "snaplearn-message snaplearn-message--error";
+  errorMessage.className = "clarity-message clarity-message--error";
   errorMessage.textContent = isExtensionReloadError
     ? "The extension was reloaded. Refresh this page, then try again."
     : normalizePopupErrorMessage(message);
 
   if (isExtensionReloadError) {
-    const refreshButton = createButton("Refresh page", "snaplearn-button snaplearn-button--accent");
+    const refreshButton = createButton("Refresh page", "clarity-button clarity-button--accent");
     refreshButton.addEventListener("click", () => {
       window.location.reload();
     });
     actions.appendChild(refreshButton);
   } else {
-    const retryButton = createButton("Retry", "snaplearn-button snaplearn-button--accent");
+    const retryButton = createButton("Retry", "clarity-button clarity-button--accent");
     retryButton.addEventListener("click", () => {
       const retrySelection =
         popupState.pendingSelection || {
@@ -358,7 +358,7 @@ function renderErrorState(popup, selectedText, message) {
     actions.appendChild(retryButton);
 
     if (isBackendSetupError) {
-      const settingsButton = createButton("Open settings", "snaplearn-button snaplearn-button--outline");
+      const settingsButton = createButton("Open settings", "clarity-button clarity-button--outline");
       settingsButton.addEventListener("click", () => {
         void openOptionsPage();
       });
@@ -372,67 +372,67 @@ function renderScaffold(popup, selectedText) {
   popup.replaceChildren();
 
   const header = document.createElement("div");
-  header.className = "snaplearn-header";
+  header.className = "clarity-header";
   enablePopupDrag(popup, header);
 
   const brand = document.createElement("div");
-  brand.className = "snaplearn-brand";
+  brand.className = "clarity-brand";
 
   const title = document.createElement("p");
-  title.className = "snaplearn-title";
+  title.className = "clarity-title";
   title.textContent = "Clarity";
 
   const subtitle = document.createElement("p");
-  subtitle.className = "snaplearn-subtitle";
+  subtitle.className = "clarity-subtitle";
   subtitle.textContent = "Explain what you're reading in place.";
 
   brand.append(title, subtitle);
   header.appendChild(brand);
 
   const preview = document.createElement("div");
-  preview.className = "snaplearn-preview";
+  preview.className = "clarity-preview";
   preview.textContent = truncateText(selectedText, 180);
 
   const body = document.createElement("div");
-  body.className = "snaplearn-body";
+  body.className = "clarity-body";
 
   const actions = document.createElement("div");
-  actions.className = "snaplearn-actions";
+  actions.className = "clarity-actions";
 
   popup.append(header, preview, body, actions);
   return { body, actions };
 }
 
-function createSection(label, text, className = "snaplearn-section") {
+function createSection(label, text, className = "clarity-section") {
   const section = document.createElement("section");
   section.className = className;
 
   const heading = document.createElement("p");
-  heading.className = "snaplearn-section-label";
+  heading.className = "clarity-section-label";
   heading.textContent = label;
 
   const content = document.createElement("p");
-  content.className = "snaplearn-section-text";
+  content.className = "clarity-section-text";
   content.textContent = text || "No extra detail returned.";
 
   section.append(heading, content);
   return section;
 }
 
-function createLoadingSection(label, className = "snaplearn-section") {
+function createLoadingSection(label, className = "clarity-section") {
   const section = document.createElement("section");
-  section.className = `${className} snaplearn-section--loading`;
+  section.className = `${className} clarity-section--loading`;
 
   const heading = document.createElement("p");
-  heading.className = "snaplearn-section-label";
+  heading.className = "clarity-section-label";
   heading.textContent = label;
 
   const skeleton = document.createElement("div");
-  skeleton.className = "snaplearn-skeleton";
+  skeleton.className = "clarity-skeleton";
 
   ["100%", "88%", "62%"].forEach((width) => {
     const line = document.createElement("span");
-    line.className = "snaplearn-skeleton-line";
+    line.className = "clarity-skeleton-line";
     line.style.width = width;
     skeleton.appendChild(line);
   });
@@ -450,7 +450,7 @@ function createButton(label, className) {
 }
 
 function createCopyButton(copyText) {
-  const button = createButton("Copy", "snaplearn-button snaplearn-button--outline snaplearn-copy");
+  const button = createButton("Copy", "clarity-button clarity-button--outline clarity-copy");
 
   button.addEventListener("click", async () => {
     try {
@@ -478,7 +478,7 @@ function createCopyButton(copyText) {
 
 function appendExplanationActions(actions, selection, explanation, copyText) {
   if (explanation.mode !== DEFAULT_EXPLANATION_MODE) {
-    const backButton = createButton("Back to regular", "snaplearn-button snaplearn-button--outline snaplearn-button--secondary");
+    const backButton = createButton("Back to regular", "clarity-button clarity-button--outline clarity-button--secondary");
     backButton.addEventListener("click", () => {
       void showExplanation(selection, popupState.anchorPoint, {
         mode: DEFAULT_EXPLANATION_MODE,
@@ -490,7 +490,7 @@ function appendExplanationActions(actions, selection, explanation, copyText) {
   if (explanation.mode !== ELI12_EXPLANATION_MODE) {
     const simplifyButton = createButton(
       "Explain like I'm 12",
-      "snaplearn-button snaplearn-button--accent"
+      "clarity-button clarity-button--accent"
     );
     simplifyButton.addEventListener("click", () => {
       void showExplanation(selection, popupState.anchorPoint, {
@@ -502,7 +502,7 @@ function appendExplanationActions(actions, selection, explanation, copyText) {
   }
 
   if (explanation.mode !== DEEP_EXPLANATION_MODE) {
-    const deepButton = createButton("Explain deeply", "snaplearn-button snaplearn-button--accent");
+    const deepButton = createButton("Explain deeply", "clarity-button clarity-button--accent");
     deepButton.addEventListener("click", () => {
       void showExplanation(selection, popupState.anchorPoint, {
         mode: DEEP_EXPLANATION_MODE,
@@ -1061,3 +1061,4 @@ async function openOptionsPage() {
     console.error("Unable to open Clarity settings:", error);
   }
 }
+
