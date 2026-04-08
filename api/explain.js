@@ -1,6 +1,3 @@
-const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash";
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "";
-const API_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
 const REQUEST_TIMEOUT_MS = 15000;
 const DEFAULT_MODE = "default";
 const ELI12_MODE = "eli12";
@@ -11,11 +8,8 @@ const MAX_CONTEXT_LENGTH = 420;
 const CACHE_TTL_MS = 1000 * 60 * 60 * 12;
 const CACHE_LIMIT = 500;
 const EXPLANATION_PIPELINE_VERSION = "v21";
-const SHOULD_LOG_PROMPT_METRICS = /^(?:1|true|yes)$/i.test(
-  String(process.env.CLARITY_LOG_PROMPT_METRICS || "")
-);
 const SYSTEM_INSTRUCTION = [
-  "You are Clarity, a helpful learning assistant.",
+  "You are Clarity.AI, a helpful learning assistant.",
   "Explain highlighted text clearly, naturally, and in plain English.",
   "Focus on what the text means and what it means in the context provided.",
   "Be specific and thorough without sounding robotic.",
@@ -37,11 +31,11 @@ function sendErrorResponse(res, status, code, message, requestId) {
 }
 
 function logPromptMetrics(requestId, request, metrics) {
-  if (!SHOULD_LOG_PROMPT_METRICS) {
+  if (!shouldLogPromptMetrics()) {
     return;
   }
 
-  console.info("Clarity prompt metrics:", {
+  console.info("Clarity.AI prompt metrics:", {
     requestId,
     mode: request?.mode || DEFAULT_MODE,
     cached: Boolean(metrics?.cached),
@@ -50,6 +44,22 @@ function logPromptMetrics(requestId, request, metrics) {
     steps: metrics?.steps || [],
     promptEstimates: metrics?.promptEstimates || {},
   });
+}
+
+function getGeminiModel() {
+  return String(process.env.GEMINI_MODEL || "").trim() || "gemini-2.5-flash";
+}
+
+function getGeminiApiKey() {
+  return String(process.env.GEMINI_API_KEY || "").trim();
+}
+
+function getGeminiApiEndpoint() {
+  return `https://generativelanguage.googleapis.com/v1beta/models/${getGeminiModel()}:generateContent`;
+}
+
+function shouldLogPromptMetrics() {
+  return /^(?:1|true|yes)$/i.test(String(process.env.CLARITY_LOG_PROMPT_METRICS || ""));
 }
 
 function normalizeServerError(error) {
@@ -62,7 +72,7 @@ function normalizeServerError(error) {
     return {
       status: 400,
       code: "invalid_request",
-      message: "Clarity received an invalid request payload.",
+      message: "Clarity.AI received an invalid request payload.",
     };
   }
 
@@ -86,7 +96,7 @@ function normalizeServerError(error) {
     return {
       status: 400,
       code: "blocked_selection",
-      message: "Clarity could not explain that selection clearly. Try a smaller or clearer highlight.",
+      message: "Clarity.AI could not explain that selection clearly. Try a smaller or clearer highlight.",
     };
   }
 
@@ -94,14 +104,14 @@ function normalizeServerError(error) {
     return {
       status: 503,
       code: "timeout",
-      message: "Clarity took too long to respond. Please try again.",
+      message: "Clarity.AI took too long to respond. Please try again.",
     };
   }
 
   return {
     status: 503,
     code: "service_unavailable",
-    message: "Clarity could not generate an explanation right now. Please try again.",
+    message: "Clarity.AI could not generate an explanation right now. Please try again.",
   };
 }
 
@@ -122,8 +132,8 @@ module.exports = async function handler(req, res) {
     return;
   }
 
-  if (!GEMINI_API_KEY) {
-    console.error("Clarity API misconfiguration:", { requestId, reason: "missing_gemini_api_key" });
+  if (!getGeminiApiKey()) {
+    console.error("Clarity.AI API misconfiguration:", { requestId, reason: "missing_gemini_api_key" });
     sendErrorResponse(
       res,
       503,
@@ -187,7 +197,7 @@ module.exports = async function handler(req, res) {
     });
   } catch (error) {
     const normalizedError = normalizeServerError(error);
-    console.error("Clarity API error:", {
+    console.error("Clarity.AI API error:", {
       requestId,
       code: normalizedError.code,
       message: error?.message || "Unknown error",
@@ -367,7 +377,7 @@ async function generateExplanation(request) {
         tokenUsage = addTokenUsage(tokenUsage, repairResult.tokenUsage);
         explanation = chooseBetterExplanation(request, explanation, repairResult.explanation);
       } catch (error) {
-        console.warn("Clarity repair generation failed:", error);
+        console.warn("Clarity.AI repair generation failed:", error);
         steps.push(
           createPromptStep("repair", request.mode, buildRepairPrompt(request, explanation), createEmptyTokenUsage(), {
             ok: false,
@@ -389,7 +399,7 @@ async function generateExplanation(request) {
         tokenUsage = addTokenUsage(tokenUsage, rescueResult.tokenUsage);
         explanation = chooseBetterExplanation(request, explanation, rescueResult.explanation);
       } catch (error) {
-        console.warn("Clarity rescue generation failed:", error);
+        console.warn("Clarity.AI rescue generation failed:", error);
         steps.push(
           createPromptStep("rescue", request.mode, buildRescuePrompt(request, explanation), createEmptyTokenUsage(), {
             ok: false,
@@ -414,7 +424,7 @@ async function generateExplanation(request) {
       }),
     };
   } catch (error) {
-    console.warn("Clarity primary generation failed:", error);
+    console.warn("Clarity.AI primary generation failed:", error);
     const fallbackExplanation = buildLastResortExplanation(request);
     return {
       explanation: fallbackExplanation,
@@ -436,12 +446,14 @@ async function requestGeminiExplanation(request, promptText) {
   const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
   try {
-    const response = await fetch(API_ENDPOINT, {
+    const geminiApiKey = getGeminiApiKey();
+    const apiEndpoint = getGeminiApiEndpoint();
+    const response = await fetch(apiEndpoint, {
       method: "POST",
       signal: controller.signal,
       headers: {
         "Content-Type": "application/json",
-        "x-goog-api-key": GEMINI_API_KEY,
+        "x-goog-api-key": geminiApiKey,
       },
       body: JSON.stringify({
         systemInstruction: {
@@ -644,7 +656,7 @@ function buildRequestMetrics(request, options = {}) {
   const rescuePrompt = explanation ? buildRescuePrompt(defaultRequest, explanation) : "";
 
   return {
-    model: GEMINI_MODEL,
+    model: getGeminiModel(),
     cached,
     usedFallback,
     error,
@@ -926,8 +938,8 @@ function buildLastResortExplanation(request) {
 
   return {
     definition: isEli12
-      ? `${selectionText || "This term"} means something specific in this passage, but Clarity could not fully explain it right now.`
-      : `${selectionText || "This term"} has a specific meaning in this passage, but Clarity could not fully resolve it from the model response.`,
+      ? `${selectionText || "This term"} means something specific in this passage, but Clarity.AI could not fully explain it right now.`
+      : `${selectionText || "This term"} has a specific meaning in this passage, but Clarity.AI could not fully resolve it from the model response.`,
     usage: contextSignals.compoundPhrase
       ? `Here, it is part of the phrase "${contextSignals.compoundPhrase}" in the sentence.`
       : isEli12
@@ -1579,7 +1591,7 @@ function extractExplanationFromGemini(data, request) {
   const blockedReason = data?.promptFeedback?.blockReason;
 
   if (blockedReason) {
-    console.warn("Clarity Gemini blocked response; using fallback.", {
+    console.warn("Clarity.AI Gemini blocked response; using fallback.", {
       blockReason: blockedReason,
       selection: request?.selection?.text || "",
     });
@@ -1596,7 +1608,7 @@ function extractExplanationFromGemini(data, request) {
     .trim();
 
   if (!rawText) {
-    console.warn("Clarity Gemini returned an empty response; using fallback.", {
+    console.warn("Clarity.AI Gemini returned an empty response; using fallback.", {
       selection: request?.selection?.text || "",
     });
     return {
@@ -1610,7 +1622,7 @@ function extractExplanationFromGemini(data, request) {
   const sanitizedExplanation = sanitizeGeneratedExplanation(explanation, request);
 
   if (!sanitizedExplanation?.definition || !sanitizedExplanation?.usage) {
-    console.warn("Clarity Gemini returned an incomplete explanation payload.", {
+    console.warn("Clarity.AI Gemini returned an incomplete explanation payload.", {
       selection: request?.selection?.text || "",
       rawText,
     });

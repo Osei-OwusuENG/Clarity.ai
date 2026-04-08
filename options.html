@@ -3,48 +3,91 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Clarity Settings</title>
+    <title>Clarity.AI Settings</title>
     <link rel="stylesheet" href="options.css" />
   </head>
   <body>
     <main class="settings-shell">
       <section class="settings-card">
-        <p class="settings-eyebrow">Clarity</p>
+        <p class="settings-eyebrow">Clarity.AI</p>
         <h1>Extension settings</h1>
         <p class="settings-intro">
-          Clarity is open source. Run the backend from this folder or point the extension at your own deployment.
-          The AI key lives in your backend <code>.env</code>, not in the extension.
+          Use Clarity.AI directly with your own Gemini API key, or point it at a self-hosted backend.
+          Direct Gemini mode works without running a local server.
         </p>
 
         <form id="settings-form" class="settings-form">
           <section class="settings-section">
             <div class="section-heading">
-              <h2>Backend URL</h2>
-              <p>Use <code>http://localhost:3000</code> for the local server in this repo, or enter your own self-hosted base URL.</p>
+              <h2>Connection</h2>
+              <p>Choose how Clarity.AI generates explanations.</p>
             </div>
 
-            <label class="field" for="backend-base-url">
-              <span class="field-label">Base URL</span>
-              <input
-                id="backend-base-url"
-                name="backendBaseUrl"
-                type="url"
-                inputmode="url"
-                autocomplete="off"
-                spellcheck="false"
-                placeholder="http://localhost:3000"
-              />
+            <label class="field" for="connection-mode">
+              <span class="field-label">Mode</span>
+              <select id="connection-mode" name="connectionMode">
+                <option value="direct">Direct Gemini (no server)</option>
+                <option value="backend">Self-hosted backend</option>
+              </select>
             </label>
 
-            <p class="settings-help">
-              Clarity calls <code>/api/explain</code> and <code>/api/health</code> on this server.
-            </p>
+            <div id="direct-settings" class="connection-panel" data-mode="direct">
+              <label class="field" for="direct-gemini-api-key">
+                <span class="field-label">Gemini API key</span>
+                <div class="secure-input-row">
+                  <input
+                    id="direct-gemini-api-key"
+                    name="directGeminiApiKey"
+                    type="password"
+                    inputmode="text"
+                    autocomplete="off"
+                    spellcheck="false"
+                    placeholder="AIza..."
+                  />
+                  <button type="button" id="toggle-api-key-visibility-button" class="secondary-button compact-button">
+                    Show
+                  </button>
+                </div>
+              </label>
+
+              <label class="field" for="direct-gemini-model">
+                <span class="field-label">Model</span>
+                <input
+                  id="direct-gemini-model"
+                  name="directGeminiModel"
+                  type="text"
+                  inputmode="text"
+                  autocomplete="off"
+                  spellcheck="false"
+                  placeholder="gemini-2.5-flash"
+                />
+              </label>
+            </div>
+
+            <div id="backend-settings" class="connection-panel" data-mode="backend" hidden>
+              <label class="field" for="backend-base-url">
+                <span class="field-label">Backend base URL</span>
+                <input
+                  id="backend-base-url"
+                  name="backendBaseUrl"
+                  type="url"
+                  inputmode="url"
+                  autocomplete="off"
+                  spellcheck="false"
+                  placeholder="http://localhost:3000"
+                />
+              </label>
+
+              <p class="settings-help">
+                Clarity.AI calls <code>/api/explain</code> and <code>/api/health</code> on this server.
+              </p>
+            </div>
           </section>
 
           <section class="settings-section">
             <div class="section-heading">
               <h2>Trigger shortcut</h2>
-              <p>Highlight text first, then press this shortcut to open Clarity.</p>
+              <p>Highlight text first, then press this shortcut to open Clarity.AI.</p>
             </div>
 
             <div class="shortcut-grid">
@@ -79,8 +122,8 @@
 
           <div class="actions">
             <button type="submit" class="primary-button">Save settings</button>
-            <button type="button" id="test-backend-button" class="secondary-button">Test backend</button>
-            <button type="button" id="use-local-backend-button" class="secondary-button">Use localhost</button>
+            <button type="button" id="test-connection-button" class="secondary-button">Test direct Gemini</button>
+            <button type="button" id="use-local-backend-button" class="secondary-button" hidden>Use localhost backend</button>
             <button type="button" id="reset-shortcut-button" class="secondary-button">Reset shortcut</button>
           </div>
         </form>

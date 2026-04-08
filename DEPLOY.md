@@ -1,4 +1,6 @@
-# Clarity Self-Hosting Guide
+# Clarity.AI Self-Hosting Guide
+
+The backend is now optional. Use this guide only if you want Clarity.AI to call your own hosted server instead of using direct Gemini mode in the extension.
 
 ## Local setup
 
@@ -22,14 +24,14 @@ You can deploy the backend anywhere that can run Node 18+ and expose:
 
 After deploying:
 
-1. Open the Clarity settings page.
+1. Open the Clarity.AI settings page.
 2. Set the backend URL to your deployed base URL.
 3. Save settings.
 4. Use `Test backend` to confirm the extension can reach `/api/health`.
 
 ## Packaging notes
 
-The extension and backend are intentionally separate.
+The Clarity.AI extension and backend are intentionally separate.
 
 Files to include in the extension package:
 

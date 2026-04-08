@@ -243,12 +243,12 @@ function sendRuntimeMessage(message) {
       }
 
       if (!response) {
-        reject(new Error("Clarity did not return a response."));
+        reject(new Error("Clarity.AI did not return a response."));
         return;
       }
 
       if (!response.ok) {
-        reject(new Error(response.error || "Clarity request failed."));
+        reject(new Error(response.error || "Clarity.AI request failed."));
         return;
       }
 

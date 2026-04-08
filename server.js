@@ -2,13 +2,13 @@ const fs = require("fs");
 const path = require("path");
 const http = require("http");
 
-const explainHandler = require("./api/explain");
-const healthHandler = require("./api/health");
-
 const DEFAULT_PORT = 3000;
 const INDEX_FILE_PATH = path.join(__dirname, "index.html");
 
 loadEnvFile(path.join(__dirname, ".env"));
+
+const explainHandler = require("./api/explain");
+const healthHandler = require("./api/health");
 
 const port = normalizePort(process.env.PORT) || DEFAULT_PORT;
 
@@ -49,7 +49,7 @@ const server = http.createServer(async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("Clarity local server error:", error);
+    console.error("Clarity.AI local server error:", error);
 
     if (res.writableEnded) {
       return;
@@ -66,7 +66,7 @@ const server = http.createServer(async (req, res) => {
 });
 
 server.listen(port, () => {
-  console.log(`Clarity backend listening on http://localhost:${port}`);
+  console.log(`Clarity.AI backend listening on http://localhost:${port}`);
 });
 
 function enhanceResponse(res) {
@@ -92,7 +92,7 @@ function loadEnvFile(filePath) {
     return;
   }
 
-  const contents = fs.readFileSync(filePath, "utf8");
+  const contents = fs.readFileSync(filePath, "utf8").replace(/^\uFEFF/, "");
 
   for (const line of contents.split(/\r?\n/)) {
     const trimmedLine = line.trim();
@@ -101,7 +101,7 @@ function loadEnvFile(filePath) {
       continue;
     }
 
-    const match = trimmedLine.match(/^([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$/);
+    const match = trimmedLine.match(/^(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$/);
 
     if (!match) {
       continue;
@@ -109,7 +109,7 @@ function loadEnvFile(filePath) {
 
     const [, key, rawValue] = match;
 
-    if (process.env[key] !== undefined) {
+    if (hasMeaningfulEnvValue(process.env[key])) {
       continue;
     }
 
@@ -126,6 +126,10 @@ function stripWrappingQuotes(value) {
   }
 
   return value;
+}
+
+function hasMeaningfulEnvValue(value) {
+  return value !== undefined && String(value).trim() !== "";
 }
 
 function normalizePort(value) {

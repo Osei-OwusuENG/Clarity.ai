@@ -322,7 +322,7 @@ function renderErrorState(popup, selectedText, message) {
   popup.dataset.state = "error";
   const { body, actions } = renderScaffold(popup, selectedText);
   const isExtensionReloadError = isExtensionReloadMessage(message);
-  const isBackendSetupError = isBackendSetupMessage(message);
+  const isSetupError = isSetupMessage(message);
 
   const errorMessage = document.createElement("p");
   errorMessage.className = "clarity-message clarity-message--error";
@@ -357,7 +357,7 @@ function renderErrorState(popup, selectedText, message) {
     });
     actions.appendChild(retryButton);
 
-    if (isBackendSetupError) {
+    if (isSetupError) {
       const settingsButton = createButton("Open settings", "clarity-button clarity-button--outline");
       settingsButton.addEventListener("click", () => {
         void openOptionsPage();
@@ -380,7 +380,7 @@ function renderScaffold(popup, selectedText) {
 
   const title = document.createElement("p");
   title.className = "clarity-title";
-  title.textContent = "Clarity";
+  title.textContent = "Clarity.AI";
 
   const subtitle = document.createElement("p");
   subtitle.className = "clarity-subtitle";
@@ -1008,12 +1008,12 @@ function sendRuntimeMessage(message) {
       }
 
       if (!response) {
-        reject(new Error("Clarity did not return a response."));
+        reject(new Error("Clarity.AI did not return a response."));
         return;
       }
 
       if (!response.ok) {
-        reject(new Error(response.error || "Clarity request failed."));
+        reject(new Error(response.error || "Clarity.AI request failed."));
         return;
       }
 
@@ -1034,22 +1034,22 @@ function normalizePopupErrorMessage(message) {
   const normalizedMessage = String(message || "").trim();
 
   if (!normalizedMessage) {
-    return "Clarity could not generate an explanation right now. Please try again.";
+    return "Clarity.AI could not generate an explanation right now. Please try again.";
   }
 
   if (
-    /select some text first|shorter highlight|shorter selection|busy right now|try again later|could not connect|could not generate an explanation|backend url|gemini_api_key|rejected the extension origin|health check|server is running|backend is missing/i.test(
+    /select some text first|shorter highlight|shorter selection|busy right now|try again later|could not connect|could not generate an explanation|backend url|gemini_api_key|rejected the extension origin|health check|server is running|backend is missing|api key|model name|switch to backend mode|internet connection/i.test(
       normalizedMessage
     )
   ) {
     return normalizedMessage;
   }
 
-  return "Clarity could not generate an explanation right now. Please try again.";
+  return "Clarity.AI could not generate an explanation right now. Please try again.";
 }
 
-function isBackendSetupMessage(message) {
-  return /backend url|gemini_api_key|rejected the extension origin|server is running|backend is missing/i.test(
+function isSetupMessage(message) {
+  return /backend url|gemini_api_key|rejected the extension origin|server is running|backend is missing|api key|model name|switch to backend mode/i.test(
     String(message || "")
   );
 }
@@ -1058,7 +1058,7 @@ async function openOptionsPage() {
   try {
     await sendRuntimeMessage({ action: "OPEN_OPTIONS" });
   } catch (error) {
-    console.error("Unable to open Clarity settings:", error);
+    console.error("Unable to open Clarity.AI settings:", error);
   }
 }
 

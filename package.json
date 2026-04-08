@@ -1,8 +1,20 @@
 {
-  "name": "clarity-extension",
+  "name": "clarity-ai-extension",
+  "displayName": "Clarity.AI",
   "private": true,
   "version": "2.0.0",
+  "description": "Clarity.AI is an open-source browser extension for in-place, context-aware explanations with direct Gemini or an optional self-hosted backend.",
+  "license": "MIT",
+  "keywords": [
+    "browser-extension",
+    "chrome-extension",
+    "gemini",
+    "ai",
+    "education",
+    "open-source"
+  ],
   "scripts": {
+    "check": "node --check background.js && node --check content.js && node --check options.js && node --check result.js && node --check server.js && node --check api/health.js && node --check api/explain.js",
     "dev": "node server.js",
     "start": "node server.js"
   },

@@ -5,7 +5,9 @@
 body {
   margin: 0;
   min-height: 100vh;
-  background: #ffffff;
+  background:
+    radial-gradient(circle at top left, rgba(20, 184, 166, 0.08), transparent 30%),
+    linear-gradient(180deg, #f8fafc 0%, #ffffff 100%);
   color: #1f2937;
   font-family: "Segoe UI", Arial, sans-serif;
 }
@@ -16,41 +18,46 @@ body {
 }
 
 .settings-card {
-  width: min(720px, 100%);
+  width: min(760px, 100%);
   margin: 0 auto;
   padding: 0;
 }
 
 .settings-eyebrow {
   margin: 0 0 8px;
-  color: #6b7280;
+  color: #0f766e;
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.08em;
 }
 
 h1 {
   margin: 0;
-  font-size: 28px;
+  font-size: 30px;
   font-weight: 700;
-  line-height: 1.2;
+  line-height: 1.15;
 }
 
 .settings-intro {
   margin: 12px 0 0;
-  max-width: 60ch;
+  max-width: 64ch;
   color: #4b5563;
   line-height: 1.6;
 }
 
 .settings-form {
   margin-top: 28px;
+  padding: 28px;
+  border: 1px solid #dbe7ec;
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 20px 50px rgba(15, 23, 42, 0.08);
 }
 
-.settings-section {
-  margin-top: 24px;
-  padding-top: 24px;
+.settings-section + .settings-section {
+  margin-top: 28px;
+  padding-top: 28px;
   border-top: 1px solid #e5e7eb;
 }
 
@@ -64,6 +71,14 @@ h1 {
   margin: 8px 0 0;
   color: #4b5563;
   line-height: 1.5;
+}
+
+.connection-panel {
+  margin-top: 18px;
+  padding: 18px;
+  border: 1px solid #dbe7ec;
+  border-radius: 18px;
+  background: #f8fbfc;
 }
 
 .settings-help {
@@ -89,24 +104,29 @@ h1 {
   font-weight: 600;
 }
 
-#api-key,
-#trigger-key,
-#trigger-modifier {
+input,
+select {
   width: 100%;
   padding: 12px 14px;
-  border: 1px solid #d1d5db;
-  border-radius: 8px;
+  border: 1px solid #cbd5e1;
+  border-radius: 12px;
   background: #ffffff;
   color: #111827;
   font: inherit;
 }
 
-#api-key:focus,
-#trigger-key:focus,
-#trigger-modifier:focus {
-  outline: 2px solid #bfdbfe;
+input:focus,
+select:focus {
+  outline: 2px solid rgba(20, 184, 166, 0.22);
   outline-offset: 1px;
-  border-color: #93c5fd;
+  border-color: #14b8a6;
+}
+
+.secure-input-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
 }
 
 .shortcut-grid {
@@ -123,7 +143,7 @@ h1 {
 
 .shortcut-preview {
   margin: 12px 0 0;
-  color: #374151;
+  color: #0f172a;
   font-size: 14px;
   font-weight: 600;
 }
@@ -132,38 +152,54 @@ h1 {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
-  margin-top: 24px;
+  margin-top: 28px;
 }
 
 .primary-button,
 .secondary-button {
   appearance: none;
-  border-radius: 8px;
+  border-radius: 12px;
   cursor: pointer;
   font: inherit;
   font-weight: 600;
-  padding: 10px 14px;
+  padding: 11px 15px;
+  transition:
+    background-color 140ms ease,
+    border-color 140ms ease,
+    color 140ms ease,
+    transform 140ms ease,
+    box-shadow 140ms ease;
+}
+
+.primary-button:hover,
+.secondary-button:hover {
+  transform: translateY(-1px);
 }
 
 .primary-button {
-  border: 1px solid #2563eb;
-  background: #2563eb;
+  border: 1px solid #0f766e;
+  background: linear-gradient(180deg, #14b8a6 0%, #0f766e 100%);
   color: #ffffff;
+  box-shadow: 0 10px 24px rgba(15, 118, 110, 0.18);
 }
 
 .secondary-button {
-  border: 1px solid #d1d5db;
+  border: 1px solid #cbd5e1;
   background: #ffffff;
   color: #1f2937;
 }
 
 .primary-button:hover {
-  background: #1d4ed8;
-  border-color: #1d4ed8;
+  border-color: #0d6962;
+  background: linear-gradient(180deg, #1ccab7 0%, #0d6962 100%);
 }
 
 .secondary-button:hover {
-  background: #f9fafb;
+  background: #f8fafc;
+}
+
+.compact-button {
+  min-width: 72px;
 }
 
 .status {
@@ -196,10 +232,16 @@ code {
     padding: 24px 16px;
   }
 
-  h1 {
-    font-size: 24px;
+  .settings-form {
+    padding: 22px;
+    border-radius: 20px;
   }
 
+  h1 {
+    font-size: 25px;
+  }
+
+  .secure-input-row,
   .shortcut-grid {
     grid-template-columns: 1fr;
   }
