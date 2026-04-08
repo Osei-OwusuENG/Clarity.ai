@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Clarity Result</title>
+    <link rel="stylesheet" href="result.css" />
+  </head>
+  <body>
+    <main class="result-shell">
+      <header class="result-header">
+        <div>
+          <p class="result-eyebrow">Clarity</p>
+          <h1>Explanation</h1>
+        </div>
+        <div class="result-header-actions">
+          <button id="simplify-button" class="secondary-button" type="button">Explain like I'm 12</button>
+          <button id="copy-button" class="secondary-button" type="button">Copy</button>
+        </div>
+      </header>
+
+      <section class="result-section">
+        <p class="section-label">Selected text</p>
+        <div id="selected-text" class="selected-text"></div>
+      </section>
+
+      <section id="error-section" class="result-section" hidden>
+        <p class="section-label">Error</p>
+        <p id="error-text" class="error-text"></p>
+      </section>
+
+      <section id="definition-section" class="result-section" hidden>
+        <p id="definition-label" class="section-label">Definition</p>
+        <p id="definition-text" class="body-text"></p>
+      </section>
+
+      <section id="usage-section" class="result-section" hidden>
+        <p id="usage-label" class="section-label">Usage</p>
+        <p id="usage-text" class="body-text body-text--usage"></p>
+      </section>
+    </main>
+
+    <script src="result.js"></script>
+  </body>
+</html>

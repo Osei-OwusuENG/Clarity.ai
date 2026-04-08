@@ -1,0 +1,206 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: #ffffff;
+  color: #1f2937;
+  font-family: "Segoe UI", Arial, sans-serif;
+}
+
+.settings-shell {
+  width: 100%;
+  padding: 32px 20px;
+}
+
+.settings-card {
+  width: min(720px, 100%);
+  margin: 0 auto;
+  padding: 0;
+}
+
+.settings-eyebrow {
+  margin: 0 0 8px;
+  color: #6b7280;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+h1 {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.settings-intro {
+  margin: 12px 0 0;
+  max-width: 60ch;
+  color: #4b5563;
+  line-height: 1.6;
+}
+
+.settings-form {
+  margin-top: 28px;
+}
+
+.settings-section {
+  margin-top: 24px;
+  padding-top: 24px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.section-heading h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.section-heading p {
+  margin: 8px 0 0;
+  color: #4b5563;
+  line-height: 1.5;
+}
+
+.settings-help {
+  margin: 12px 0 0;
+  color: #4b5563;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.field {
+  display: block;
+}
+
+.field + .field {
+  margin-top: 16px;
+}
+
+.field-label {
+  display: block;
+  margin-bottom: 8px;
+  color: #374151;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+#api-key,
+#trigger-key,
+#trigger-modifier {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #111827;
+  font: inherit;
+}
+
+#api-key:focus,
+#trigger-key:focus,
+#trigger-modifier:focus {
+  outline: 2px solid #bfdbfe;
+  outline-offset: 1px;
+  border-color: #93c5fd;
+}
+
+.shortcut-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 180px) minmax(0, 180px);
+  align-items: end;
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.shortcut-grid .field + .field {
+  margin-top: 0;
+}
+
+.shortcut-preview {
+  margin: 12px 0 0;
+  color: #374151;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 24px;
+}
+
+.primary-button,
+.secondary-button {
+  appearance: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 600;
+  padding: 10px 14px;
+}
+
+.primary-button {
+  border: 1px solid #2563eb;
+  background: #2563eb;
+  color: #ffffff;
+}
+
+.secondary-button {
+  border: 1px solid #d1d5db;
+  background: #ffffff;
+  color: #1f2937;
+}
+
+.primary-button:hover {
+  background: #1d4ed8;
+  border-color: #1d4ed8;
+}
+
+.secondary-button:hover {
+  background: #f9fafb;
+}
+
+.status {
+  min-height: 0;
+  margin: 18px 0 0;
+  color: #374151;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.status[data-state="success"] {
+  color: #166534;
+}
+
+.status[data-state="error"] {
+  color: #b91c1c;
+}
+
+.status:empty {
+  display: none;
+}
+
+code {
+  font-family: Consolas, "Courier New", monospace;
+  font-size: 0.95em;
+}
+
+@media (max-width: 640px) {
+  .settings-shell {
+    padding: 24px 16px;
+  }
+
+  h1 {
+    font-size: 24px;
+  }
+
+  .shortcut-grid {
+    grid-template-columns: 1fr;
+  }
+}

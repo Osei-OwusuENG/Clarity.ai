@@ -1,0 +1,12 @@
+{
+  "name": "clarity-extension",
+  "private": true,
+  "version": "2.0.0",
+  "scripts": {
+    "dev": "node server.js",
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

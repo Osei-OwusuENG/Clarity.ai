@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Clarity Backend</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        padding: 32px 20px;
+        background: #ffffff;
+        color: #111827;
+        font-family: "Segoe UI", Arial, sans-serif;
+      }
+
+      main {
+        width: min(720px, 100%);
+        margin: 0 auto;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: 32px;
+        line-height: 1.2;
+      }
+
+      p {
+        margin: 16px 0 0;
+        color: #374151;
+        line-height: 1.7;
+      }
+
+      .card {
+        margin-top: 24px;
+        padding: 18px 20px;
+        border: 1px solid #e5e7eb;
+        border-radius: 12px;
+        background: #ffffff;
+      }
+
+      .label {
+        margin: 0 0 10px;
+        color: #6b7280;
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+      }
+
+      .status {
+        margin: 0;
+        color: #111827;
+        font-weight: 600;
+      }
+
+      .status[data-state="ok"] {
+        color: #166534;
+      }
+
+      .status[data-state="error"] {
+        color: #b91c1c;
+      }
+
+      a {
+        color: #111827;
+      }
+
+      code {
+        font-family: Consolas, "Courier New", monospace;
+        font-size: 0.95em;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Clarity backend</h1>
+      <p>This local server powers the Clarity browser extension.</p>
+
+      <section class="card">
+        <p class="label">Status</p>
+        <p id="status" class="status" data-state="loading">Checking backend health...</p>
+      </section>
+
+      <section class="card">
+        <p class="label">Quick Start</p>
+        <p>1. Add your Gemini key to <code>.env</code>.</p>
+        <p>2. Keep the extension backend URL at <code>http://localhost:3000</code>.</p>
+        <p>3. Use the settings page to test <code>/api/health</code>.</p>
+      </section>
+
+      <section class="card">
+        <p class="label">Endpoints</p>
+        <p><code>/api/explain</code> generates explanations.</p>
+        <p><code>/api/health</code> returns a simple health check.</p>
+        <p><a href="/api/health" target="_blank" rel="noreferrer">Open health check</a></p>
+      </section>
+    </main>
+
+    <script>
+      const statusElement = document.getElementById("status");
+
+      async function checkHealth() {
+        try {
+          const response = await fetch("/api/health");
+          const data = await response.json();
+
+          if (!response.ok || !data.ok) {
+            throw new Error("Health check failed.");
+          }
+
+          statusElement.dataset.state = data.hasGeminiKey ? "ok" : "error";
+          statusElement.textContent = data.hasGeminiKey
+            ? `Healthy. Model: ${data.model}`
+            : "Server is reachable, but GEMINI_API_KEY is missing in .env.";
+        } catch (error) {
+          statusElement.dataset.state = "error";
+          statusElement.textContent = "Could not reach /api/health.";
+        }
+      }
+
+      void checkHealth();
+    </script>
+  </body>
+</html>
