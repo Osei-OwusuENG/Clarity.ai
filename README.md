@@ -34,11 +34,11 @@ It keeps the reading flow intact: highlight text, press a shortcut, and get an e
 
 ## Configuration
 
-- `GEMINI_API_KEY`: required
-- `GEMINI_MODEL`: optional, defaults to `gemini-2.5-flash`
-- `PORT`: optional, defaults to `3000`
-- `ALLOWED_EXTENSION_ORIGINS`: optional comma-separated allowlist of extension origins
-- `CLARITY_LOG_PROMPT_METRICS`: optional debug logging flag
+- `GEMINI_API_KEY`: required; put your real Gemini API key here
+- `GEMINI_MODEL`: optional; model name such as `gemini-2.5-flash`
+- `PORT`: optional; local backend port, usually `3000`
+- `ALLOWED_EXTENSION_ORIGINS`: optional comma-separated allowlist such as `chrome-extension://YOUR_EXTENSION_ID`
+- `CLARITY_LOG_PROMPT_METRICS`: optional debug flag; use `true` to enable or `false`/blank to disable
 
 If `ALLOWED_EXTENSION_ORIGINS` is empty, the backend accepts requests from any origin. For a tighter setup, set it to your unpacked or published extension origin, for example `chrome-extension://YOUR_EXTENSION_ID`.
 

@@ -8,6 +8,7 @@
    - `GEMINI_MODEL=gemini-2.5-flash`
    - `PORT=3000`
    - `ALLOWED_EXTENSION_ORIGINS=chrome-extension://YOUR_EXTENSION_ID`
+   - `CLARITY_LOG_PROMPT_METRICS=false`
 4. Start the backend with `npm run dev`.
 5. Verify the backend with `http://localhost:3000/api/health`.
 6. Load the extension unpacked and keep the backend URL in settings at `http://localhost:3000`.
