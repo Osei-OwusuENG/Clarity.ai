@@ -72,7 +72,7 @@ If `ALLOWED_EXTENSION_ORIGINS` is empty, the backend accepts requests from any o
 
 ## License
 
-This project is released under the MIT License. See `LICENSE`.
+This project is released under the GNU General Public License v3.0. See `LICENSE`.
 
 ## Notes
 

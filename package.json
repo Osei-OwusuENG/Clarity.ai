@@ -4,7 +4,7 @@
   "private": true,
   "version": "2.0.0",
   "description": "Clarity.AI is an open-source browser extension for in-place, context-aware explanations with direct Gemini or an optional self-hosted backend.",
-  "license": "MIT",
+  "license": "GPL-3.0-only",
   "keywords": [
     "browser-extension",
     "chrome-extension",
