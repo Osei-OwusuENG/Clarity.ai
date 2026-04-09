@@ -22,12 +22,26 @@ Highlight a word, phrase, or passage, press your shortcut, and get a clear expla
 
 ## Quick start
 
-1. Load the repo root as an unpacked Chrome extension.
+### Install in Chrome
+
+1. Click the green `Code` button on this repository.
+2. Select `Download ZIP`.
+3. Extract the ZIP file on your computer.
+4. Open Chrome and go to `chrome://extensions/`.
+5. Turn on `Developer mode`.
+6. Click `Load unpacked`.
+7. Select the extracted project folder.
+8. The extension should now appear in Chrome.
+
+### Set up Clarity.AI
+
+1. Load the extension in Chrome.
 2. Open the Clarity.AI settings page.
 3. Leave the mode on `Direct Gemini (no server)`.
-4. Paste your Gemini API key and keep the model at `gemini-2.5-flash` unless you want a different one.
-5. Save settings.
-6. Highlight text on any page and trigger Clarity.AI with your configured shortcut.
+4. Paste your Gemini API key.
+5. Keep the model at `gemini-2.5-flash` unless you want a different one.
+6. Save settings.
+7. Highlight text on any page and trigger Clarity.AI with your configured shortcut.
 
 ## Optional backend mode
 
