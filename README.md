@@ -4,6 +4,8 @@ Clarity.AI is an open-source browser extension for understanding what you read w
 
 Highlight a word, phrase, or passage, press your shortcut, and get a clear explanation in context. By default, users can paste their own Gemini API key into the extension settings and run Clarity.AI with no local server. A self-hosted backend is still available as an optional mode.
 
+![Clarity.AI explaining highlighted text in context](images/clarity-ai-screenshot.jpeg)
+
 ## Why Clarity.AI
 
 - In-place explanations instead of tab switching
