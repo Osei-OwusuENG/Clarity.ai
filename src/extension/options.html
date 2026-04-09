@@ -12,8 +12,8 @@
         <p class="settings-eyebrow">Clarity.AI</p>
         <h1>Extension settings</h1>
         <p class="settings-intro">
-          Use Clarity.AI directly with your own Gemini API key, or point it at a self-hosted backend.
-          Direct Gemini mode works without running a local server.
+          Use Clarity.AI directly with your own API key, or point it at a self-hosted backend.
+          Direct mode works without running a local server.
         </p>
 
         <form id="settings-form" class="settings-form">
@@ -26,14 +26,14 @@
             <label class="field" for="connection-mode">
               <span class="field-label">Mode</span>
               <select id="connection-mode" name="connectionMode">
-                <option value="direct">Direct Gemini (no server)</option>
+                <option value="direct">Direct mode (no server)</option>
                 <option value="backend">Self-hosted backend</option>
               </select>
             </label>
 
             <div id="direct-settings" class="connection-panel" data-mode="direct">
               <label class="field" for="direct-gemini-api-key">
-                <span class="field-label">Gemini API key</span>
+                <span class="field-label">API key</span>
                 <div class="secure-input-row">
                   <input
                     id="direct-gemini-api-key"
@@ -122,7 +122,7 @@
 
           <div class="actions">
             <button type="submit" class="primary-button">Save settings</button>
-            <button type="button" id="test-connection-button" class="secondary-button">Test direct Gemini</button>
+            <button type="button" id="test-connection-button" class="secondary-button">Test direct mode</button>
             <button type="button" id="use-local-backend-button" class="secondary-button" hidden>Use localhost backend</button>
             <button type="button" id="reset-shortcut-button" class="secondary-button">Reset shortcut</button>
           </div>

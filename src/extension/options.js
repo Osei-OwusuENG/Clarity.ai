@@ -207,7 +207,7 @@ function updateConnectionModeUI() {
   directSettingsPanel.hidden = !isDirectMode;
   backendSettingsPanel.hidden = isDirectMode;
   useLocalBackendButton.hidden = isDirectMode;
-  testConnectionButton.textContent = isDirectMode ? "Test direct Gemini" : "Test backend";
+  testConnectionButton.textContent = isDirectMode ? "Test direct mode" : "Test backend";
 }
 
 function updateShortcutPreview() {
@@ -226,7 +226,7 @@ function validateSettings(settings) {
   if (settings.connectionMode === CONNECTION_MODE_DIRECT) {
     if (!settings.directGeminiApiKey) {
       return {
-        message: "Add your Gemini API key for direct mode.",
+        message: "Add your API key for direct mode.",
         focusTarget: directGeminiApiKeyInput,
       };
     }
@@ -252,7 +252,7 @@ function validateSettings(settings) {
 }
 
 function formatConnectionModeLabel(connectionMode) {
-  return connectionMode === CONNECTION_MODE_BACKEND ? "Self-hosted backend" : "Direct Gemini";
+  return connectionMode === CONNECTION_MODE_BACKEND ? "Self-hosted backend" : "Direct mode";
 }
 
 function formatShortcutLabel(shortcut) {
