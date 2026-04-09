@@ -3,9 +3,10 @@ const path = require("path");
 const http = require("http");
 
 const DEFAULT_PORT = 3000;
+const REPO_ROOT_PATH = path.resolve(__dirname, "..", "..");
 const INDEX_FILE_PATH = path.join(__dirname, "index.html");
 
-loadEnvFile(path.join(__dirname, ".env"));
+loadEnvFile(path.join(REPO_ROOT_PATH, ".env"));
 
 const explainHandler = require("./api/explain");
 const healthHandler = require("./api/health");

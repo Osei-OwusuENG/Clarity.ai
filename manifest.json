@@ -5,29 +5,29 @@
   "version": "2.0.0",
   "description": "Highlight text to get clear, context-aware explanations across the web.",
   "icons": {
-    "16": "icons/icon16.png",
-    "32": "icons/icon32.png",
-    "48": "icons/icon48.png",
-    "128": "icons/icon128.png"
+    "16": "src/extension/icons/icon16.png",
+    "32": "src/extension/icons/icon32.png",
+    "48": "src/extension/icons/icon48.png",
+    "128": "src/extension/icons/icon128.png"
   },
   "permissions": ["storage", "contextMenus"],
   "host_permissions": ["http://*/*", "https://*/*"],
   "background": {
-    "service_worker": "background.js"
+    "service_worker": "src/extension/background.js"
   },
   "action": {
     "default_title": "Clarity.AI",
     "default_icon": {
-      "16": "icons/icon16.png",
-      "32": "icons/icon32.png"
+      "16": "src/extension/icons/icon16.png",
+      "32": "src/extension/icons/icon32.png"
     }
   },
-  "options_page": "options.html",
+  "options_page": "src/extension/options.html",
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
-      "js": ["content.js"],
-      "css": ["styles.css"],
+      "js": ["src/extension/content.js"],
+      "css": ["src/extension/styles.css"],
       "run_at": "document_idle"
     }
   ]

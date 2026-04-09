@@ -14,9 +14,9 @@
     "open-source"
   ],
   "scripts": {
-    "check": "node --check background.js && node --check content.js && node --check options.js && node --check result.js && node --check server.js && node --check api/health.js && node --check api/explain.js",
-    "dev": "node server.js",
-    "start": "node server.js"
+    "check": "node --check src/extension/background.js && node --check src/extension/content.js && node --check src/extension/options.js && node --check src/extension/result.js && node --check src/backend/server.js && node --check src/backend/api/health.js && node --check src/backend/api/explain.js",
+    "dev": "node src/backend/server.js",
+    "start": "node src/backend/server.js"
   },
   "engines": {
     "node": ">=18"

@@ -36,26 +36,25 @@ The Clarity.AI extension and backend are intentionally separate.
 Files to include in the extension package:
 
 - `manifest.json`
-- `background.js`
-- `content.js`
-- `styles.css`
-- `options.html`
-- `options.css`
-- `options.js`
-- `result.html`
-- `result.css`
-- `result.js`
-- `icons/icon16.png`
-- `icons/icon32.png`
-- `icons/icon48.png`
-- `icons/icon128.png`
+- `src/extension/background.js`
+- `src/extension/content.js`
+- `src/extension/styles.css`
+- `src/extension/options.html`
+- `src/extension/options.css`
+- `src/extension/options.js`
+- `src/extension/result.html`
+- `src/extension/result.css`
+- `src/extension/result.js`
+- `src/extension/icons/icon16.png`
+- `src/extension/icons/icon32.png`
+- `src/extension/icons/icon48.png`
+- `src/extension/icons/icon128.png`
 
 Files not to publish with the extension package:
 
 - `.env`
 - `.env.example`
-- `api/`
-- `server.js`
+- `src/backend/`
 - `package.json`
 - `package-lock.json`
 

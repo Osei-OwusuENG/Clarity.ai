@@ -1140,7 +1140,7 @@ async function openResultPage(payload) {
   return new Promise((resolve, reject) => {
     chrome.tabs.create(
       {
-        url: chrome.runtime.getURL(`result.html?id=${encodeURIComponent(resultId)}`),
+        url: chrome.runtime.getURL(`src/extension/result.html?id=${encodeURIComponent(resultId)}`),
       },
       (tab) => {
         if (chrome.runtime.lastError) {

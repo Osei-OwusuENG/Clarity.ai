@@ -22,7 +22,7 @@ Highlight a word, phrase, or passage, press your shortcut, and get a clear expla
 
 ## Quick start
 
-1. Load this folder as an unpacked Chrome extension.
+1. Load the repo root as an unpacked Chrome extension.
 2. Open the Clarity.AI settings page.
 3. Leave the mode on `Direct Gemini (no server)`.
 4. Paste your Gemini API key and keep the model at `gemini-2.5-flash` unless you want a different one.
@@ -43,18 +43,15 @@ If you prefer not to store the API key in the extension, Clarity.AI can also tal
 
 - Run `npm run check` to syntax-check the extension and backend files.
 - Run `npm run dev` only if you want backend mode.
-- Reload the unpacked extension after changing extension files.
+- Reload the unpacked extension after changing files under `src/extension`.
 
 ## Project structure
 
-- `server.js`: local backend runner for `/api/explain` and `/api/health`
-- `background.js`: extension service worker and backend request layer
-- `content.js`: text selection handling, popup UI, and shortcut flow
-- `styles.css`: popup styling
-- `options.html`, `options.js`, `options.css`: extension settings
-- `result.html`, `result.js`, `result.css`: standalone explanation view for context-menu flows
-- `api/explain.js`: explanation endpoint
-- `api/health.js`: health endpoint
+- `manifest.json`: extension manifest kept at the repo root so the whole repo can be loaded unpacked in Chrome
+- `src/extension/`: extension runtime, settings pages, result pages, styling, and icons
+- `src/backend/server.js`: local backend entry point
+- `src/backend/api/`: backend endpoints for `/api/explain` and `/api/health`
+- `README.md`, `DEPLOY.md`, `LAUNCH.md`: repo docs and release guidance
 
 ## Launch assets
 
