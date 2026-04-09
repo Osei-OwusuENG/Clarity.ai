@@ -6,6 +6,8 @@ Highlight a word, phrase, or passage, press your shortcut, and get a clear expla
 
 ![Clarity.AI explaining highlighted text in context](images/clarity-ai-screenshot.jpeg)
 
+First public version.
+
 ## Why Clarity.AI
 
 - In-place explanations instead of tab switching
@@ -22,28 +24,23 @@ Highlight a word, phrase, or passage, press your shortcut, and get a clear expla
 - Supports copyable results and a context-menu flow for PDFs/browser documents
 - Works in `Direct Gemini (no server)` mode or with an optional self-hosted backend
 
-## Quick start
+## Install
 
-### Install in Chrome
+1. Download ZIP.
+2. Extract it.
+3. Open `chrome://extensions`.
+4. Enable `Developer mode`.
+5. Click `Load unpacked`.
+6. Select the folder.
 
-1. Click the green `Code` button on this repository.
-2. Select `Download ZIP`.
-3. Extract the ZIP file on your computer.
-4. Open Chrome and go to `chrome://extensions/`.
-5. Turn on `Developer mode`.
-6. Click `Load unpacked`.
-7. Select the extracted project folder.
-8. The extension should now appear in Chrome.
+## Setup
 
-### Set up Clarity.AI
-
-1. Load the extension in Chrome.
-2. Open the Clarity.AI settings page.
-3. Leave the mode on `Direct Gemini (no server)`.
-4. Paste your Gemini API key.
-5. Keep the model at `gemini-2.5-flash` unless you want a different one.
-6. Save settings.
-7. Highlight text on any page and trigger Clarity.AI with your configured shortcut.
+1. Load the extension.
+2. Open the extension settings.
+3. Add your API key in settings.
+4. Save.
+5. Keep the default model unless you want a different one.
+6. Highlight text on any page and trigger Clarity.AI with your configured shortcut.
 
 ## Optional backend mode
 
