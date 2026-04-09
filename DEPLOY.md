@@ -1,39 +1,52 @@
-# Clarity.AI Self-Hosting Guide
+# Self-Hosting Clarity.AI
 
-The backend is now optional. Use this guide only if you want Clarity.AI to call your own hosted server instead of using direct Gemini mode in the extension.
+Most people do not need a backend. Clarity.AI works out of the box in `Direct Gemini (no server)` mode, which is the simplest setup.
 
-## Local setup
+Use the backend only if you want the API key to live on a server instead of inside the extension, or if you want tighter control over which extension origins can call it.
+
+## Run it locally
 
 1. Copy `.env.example` to `.env`.
-2. Set `GEMINI_API_KEY=your_real_gemini_key`.
-3. Optionally set:
-   - `GEMINI_MODEL=gemini-2.5-flash`
-   - `PORT=3000`
-   - `ALLOWED_EXTENSION_ORIGINS=chrome-extension://YOUR_EXTENSION_ID`
-   - `CLARITY_LOG_PROMPT_METRICS=false`
-4. Start the backend with `npm run dev`.
-5. Verify the backend with `http://localhost:3000/api/health`.
-6. Load the extension unpacked and keep the backend URL in settings at `http://localhost:3000`.
+2. Add your Gemini key:
 
-## Optional deployment
+   `GEMINI_API_KEY=your_real_gemini_key`
 
-You can deploy the backend anywhere that can run Node 18+ and expose:
+3. Optionally change the other settings in `.env`:
+
+   `GEMINI_MODEL=gemini-2.5-flash`
+
+   `PORT=3000`
+
+   `ALLOWED_EXTENSION_ORIGINS=chrome-extension://YOUR_EXTENSION_ID`
+
+   `CLARITY_LOG_PROMPT_METRICS=false`
+
+4. Start the backend:
+
+   `npm run dev`
+
+5. Open `http://localhost:3000/api/health` and make sure it returns `ok: true`.
+6. In the extension settings, switch to `Self-hosted backend`, set the backend URL to `http://localhost:3000`, save, and use `Test backend`.
+
+## Deploy it elsewhere
+
+The backend is a small Node 18+ service. It only exposes two routes:
 
 - `GET /api/health`
 - `POST /api/explain`
 
-After deploying:
+If you deploy it to your own server or platform, point the extension at the deployed base URL in settings and run `Test backend` before relying on it.
 
-1. Open the Clarity.AI settings page.
-2. Set the backend URL to your deployed base URL.
-3. Save settings.
-4. Use `Test backend` to confirm the extension can reach `/api/health`.
+## Security notes
 
-## Packaging notes
+- If `ALLOWED_EXTENSION_ORIGINS` is blank, the backend accepts requests from any origin.
+- For anything beyond local testing, set `ALLOWED_EXTENSION_ORIGINS` to your actual extension ID or IDs.
+- Keep `.env` private and out of version control.
+- If other people are self-hosting Clarity.AI, they should create their own `.env` with their own key.
 
-The Clarity.AI extension and backend are intentionally separate.
+## Packaging the extension separately
 
-Files to include in the extension package:
+If you only want to distribute the browser extension, include:
 
 - `manifest.json`
 - `src/extension/background.js`
@@ -50,7 +63,7 @@ Files to include in the extension package:
 - `src/extension/icons/icon48.png`
 - `src/extension/icons/icon128.png`
 
-Files not to publish with the extension package:
+Do not include:
 
 - `.env`
 - `.env.example`
@@ -58,18 +71,13 @@ Files not to publish with the extension package:
 - `package.json`
 - `package-lock.json`
 
-## Hardening
+## Quick sanity check
 
-- Leave `ALLOWED_EXTENSION_ORIGINS` blank for quick local use.
-- Set `ALLOWED_EXTENSION_ORIGINS` before sharing or deploying the backend publicly.
-- Keep `.env` private. Users should create their own local copy with their own key.
+Before sharing a self-hosted setup, make sure:
 
-## Verification checklist
-
-1. `GET /api/health` returns `ok: true`.
-2. The settings page can reach the backend with `Test backend`.
-3. Normal explanation works.
-4. `Explain like I'm 12` works.
-5. `Explain deeply` works.
-6. Copy works in popup and result views.
-7. Oversized-selection and backend-error states render cleanly.
+- `/api/health` responds
+- `Test backend` succeeds in the settings page
+- a normal explanation works
+- `Explain like I'm 12` works
+- `Explain deeply` works
+- backend errors show clear messages

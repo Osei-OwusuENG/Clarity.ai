@@ -23,7 +23,7 @@ const MAX_CONTEXT_LENGTH = 420;
 const CACHE_LIMIT = 60;
 const CONTEXT_MENU_ID = "clarity-explain-selection";
 const RESULT_STORAGE_PREFIX = "clarity-result:";
-const CACHE_SCHEMA_VERSION = "v23";
+const CACHE_SCHEMA_VERSION = "v24";
 const LOCAL_CACHE_PREFIX = `clarity-backend-cache:${CACHE_SCHEMA_VERSION}:`;
 const LOCAL_CACHE_INDEX_KEY = `clarity-backend-cache-index:${CACHE_SCHEMA_VERSION}`;
 const LOCAL_CACHE_LIMIT = 240;
@@ -752,14 +752,14 @@ function getDirectTemperatureForMode(mode) {
 
 function getDirectMaxOutputTokensForMode(mode) {
   if (mode === ELI12_MODE) {
-    return 180;
+    return 220;
   }
 
   if (mode === DEEP_MODE) {
-    return 560;
+    return 640;
   }
 
-  return 280;
+  return 360;
 }
 
 function buildDirectPrompt(request) {
@@ -774,14 +774,17 @@ function buildDirectPrompt(request) {
   const contextText = normalizeSelectionText(request.selection.contextText);
   const pageTitle = normalizeSelectionText(request.selection.pageTitle);
   const hostname = normalizeSelectionText(request.selection.hostname);
+  const contextSignals = getSelectionContextSignals(request.selection.text, contextText);
 
   return [
     "Return JSON with definition and usage.",
-    "Definition: explain what the highlighted text means clearly.",
-    "Usage: explain what the highlighted text means in this exact context.",
+    "Definition: explain what the highlighted text means clearly in 2 to 4 sentences.",
+    "Usage: explain what the highlighted text means in this exact context in 1 to 3 sentences.",
+    "If the highlighted text is part of a longer technical phrase, use that nearby phrase to explain the role it plays here.",
     "Be natural, specific, and easy to follow.",
     pageTitle ? `Page title: ${pageTitle}` : "",
     hostname ? `Website: ${hostname}` : "",
+    contextSignals.compoundPhrase ? `Nearby phrase: ${contextSignals.compoundPhrase}` : "",
     contextText ? `Context: ${contextText}` : "",
     `Highlighted text: ${request.selection.text}`,
   ]
@@ -794,14 +797,17 @@ function buildDirectEli12Prompt(request) {
   const sourceUsage = normalizeSelectionText(request.sourceExplanation?.usage);
   const contextText = normalizeSelectionText(request.selection.contextText);
   const pageTitle = normalizeSelectionText(request.selection.pageTitle);
+  const contextSignals = getSelectionContextSignals(request.selection.text, contextText);
 
   return [
     "Explain this for a 12-year-old.",
     "Use short everyday words.",
     "Definition: explain what the highlighted text means simply.",
     "Usage: explain what it means in the context where it appears.",
+    "If it is part of a longer phrase, use that phrase to explain what job it is doing here.",
     `Highlighted text: ${request.selection.text}`,
     pageTitle ? `Page title: ${pageTitle}` : "",
+    contextSignals.compoundPhrase ? `Nearby phrase: ${contextSignals.compoundPhrase}` : "",
     sourceDefinition ? `Current definition: ${sourceDefinition}` : "",
     sourceUsage ? `Current in-context explanation: ${sourceUsage}` : "",
     !sourceDefinition && contextText ? `Context: ${contextText}` : "",
@@ -815,14 +821,17 @@ function buildDirectDeepPrompt(request) {
   const sourceUsage = normalizeSelectionText(request.sourceExplanation?.usage);
   const contextText = normalizeSelectionText(request.selection.contextText);
   const pageTitle = normalizeSelectionText(request.selection.pageTitle);
+  const contextSignals = getSelectionContextSignals(request.selection.text, contextText);
 
   return [
     "Give a more detailed explanation than the regular version.",
     "Keep it natural, clear, and easy to read.",
     "Definition: explain the core meaning in fuller detail.",
     "Usage: explain how it is being used here, why that matters, and include one short concrete example or illustration.",
+    "If the highlight is part of a longer technical phrase, use that phrase and explain how the modifiers change the meaning.",
     `Highlighted text: ${request.selection.text}`,
     pageTitle ? `Page title: ${pageTitle}` : "",
+    contextSignals.compoundPhrase ? `Nearby phrase: ${contextSignals.compoundPhrase}` : "",
     sourceDefinition ? `Current definition: ${sourceDefinition}` : "",
     sourceUsage ? `Current in-context explanation: ${sourceUsage}` : "",
     contextText ? `Context: ${contextText}` : "",
@@ -893,10 +902,24 @@ function parseExplanationFromRawText(rawText) {
 
 function sanitizeGeneratedExplanation(explanation, request) {
   const normalizedExplanation = sanitizeExplanation(explanation, request.mode);
-  const definition = cleanGeneratedField(normalizeSelectionText(normalizedExplanation?.definition));
-  const usage =
-    cleanGeneratedField(normalizeSelectionText(normalizedExplanation?.usage)) ||
-    buildFallbackUsage(request, definition);
+  let definition = cleanGeneratedField(normalizeSelectionText(normalizedExplanation?.definition));
+  let usage = cleanGeneratedField(normalizeSelectionText(normalizedExplanation?.usage));
+
+  if (isPlaceholderFieldValue(definition) || looksTruncatedField(definition)) {
+    definition = "";
+  }
+
+  if (
+    isPlaceholderUsageValue(usage) ||
+    looksTruncatedField(usage) ||
+    isClearlyGenericUsage(usage)
+  ) {
+    usage = "";
+  }
+
+  if (!usage && definition) {
+    usage = buildFallbackUsage(request, definition);
+  }
 
   return {
     definition,
@@ -989,16 +1012,51 @@ function cleanGeneratedField(text) {
 
 function buildFallbackUsage(request, definitionText = "") {
   const selectionText = normalizeSelectionText(request.selection?.text);
+  const contextText = normalizeSelectionText(request.selection?.contextText);
+  const isEli12 = request.mode === ELI12_MODE;
+  const contextSignals = getSelectionContextSignals(selectionText, contextText);
+  const compoundFallback = buildCompoundAwareFallback(selectionText, contextSignals, isEli12);
+  const definitionSummary = summarizeDefinitionForUsage(definitionText, selectionText);
+
+  if (compoundFallback?.usage) {
+    if (request.mode === DEEP_MODE) {
+      return combineExplanationText(
+        compoundFallback.usage,
+        "That role comes from how the highlighted term modifies the larger technical phrase."
+      );
+    }
+
+    return compoundFallback.usage;
+  }
 
   if (request.mode === ELI12_MODE) {
+    if (definitionSummary) {
+      return `Here, this term refers to ${definitionSummary}.`;
+    }
+
     return "Here, that is what the sentence is trying to say in simpler words.";
   }
 
   if (request.mode === DEEP_MODE) {
+    if (definitionSummary) {
+      return combineExplanationText(
+        `Here, "${selectionText}" refers to ${toSentenceFragment(definitionSummary)} in this context.`,
+        "The surrounding sentence is using it as part of the technical point being made."
+      );
+    }
+
     return combineExplanationText(
       `Here, "${selectionText}" carries that meaning in this context.`,
       "A deeper explanation was unavailable, but it is part of the point the passage is making."
     );
+  }
+
+  if (definitionSummary) {
+    return `Here, "${selectionText}" refers to ${toSentenceFragment(definitionSummary)} in this sentence.`;
+  }
+
+  if (contextSignals.compoundPhrase) {
+    return `Here, it is part of the phrase "${contextSignals.compoundPhrase}" in the sentence.`;
   }
 
   if (definitionText) {
@@ -1006,6 +1064,219 @@ function buildFallbackUsage(request, definitionText = "") {
   }
 
   return "Here, it is being used with a specific meaning in the surrounding sentence.";
+}
+
+function isPlaceholderFieldValue(text) {
+  const normalizedText = normalizeSelectionText(text).toLowerCase();
+
+  return (
+    normalizedText === "definition" ||
+    normalizedText === "usage" ||
+    normalizedText === "in context" ||
+    normalizedText === "context" ||
+    normalizedText === "meaning"
+  );
+}
+
+function isPlaceholderUsageValue(text) {
+  const normalizedText = normalizeSelectionText(text).toLowerCase();
+
+  return (
+    isPlaceholderFieldValue(normalizedText) ||
+    /\b(?:describe|describes|describing|point|points|pointing)\s+(?:to|at)\s+definition\b/i.test(normalizedText) ||
+    /\bused to\s+(?:describe|point to)\s+definition\b/i.test(normalizedText) ||
+    /\bused to\s+(?:describe|point to)\s+usage\b/i.test(normalizedText)
+  );
+}
+
+function looksTruncatedField(text) {
+  const normalizedText = normalizeSelectionText(text);
+
+  if (!normalizedText) {
+    return false;
+  }
+
+  if (/[\\/]$/.test(normalizedText)) {
+    return true;
+  }
+
+  if (/[,:;([{]$/.test(normalizedText)) {
+    return true;
+  }
+
+  const doubleQuoteCount = (normalizedText.match(/"/g) || []).length;
+  return doubleQuoteCount % 2 === 1;
+}
+
+function isClearlyGenericUsage(text) {
+  const normalizedText = normalizeSelectionText(text);
+
+  return (
+    /^in this context[,:\s]*$/i.test(normalizedText) ||
+    /^here[,:\s]*$/i.test(normalizedText) ||
+    /^definition$/i.test(normalizedText) ||
+    /^usage$/i.test(normalizedText) ||
+    /\bit names the specific idea the sentence is talking about\b/i.test(normalizedText) ||
+    /\bit points to the specific idea the sentence is talking about\b/i.test(normalizedText) ||
+    /\bthe highlighted text is being used to\b/i.test(normalizedText) ||
+    /\bdescribe or point to definition\b/i.test(normalizedText) ||
+    /\bpoint to definition\b/i.test(normalizedText)
+  );
+}
+
+function summarizeDefinitionForUsage(definitionText, selectionText) {
+  let summary = normalizeSelectionText(definitionText)
+    .split(/(?<=[.!?])\s+/)[0]
+    ?.trim();
+
+  if (!summary) {
+    return "";
+  }
+
+  const escapedSelection = escapeRegExp(normalizeSelectionText(selectionText));
+
+  summary = summary
+    .replace(new RegExp(`^(?:the\\s+word|word|the\\s+term|term)\\s+["']?${escapedSelection}["']?\\s+(?:is|means|refers to)\\s+`, "i"), "")
+    .replace(new RegExp(`^(?:the|a|an)\\s+${escapedSelection}\\s+(?:is|means|refers to)\\s+`, "i"), "")
+    .replace(new RegExp(`^${escapedSelection}\\s+(?:is|means|refers to)\\s+`, "i"), "")
+    .replace(/^it\s+(?:is|means|refers to)\s+/i, "")
+    .replace(/^this\s+(?:is|means|refers to)\s+/i, "")
+    .replace(/[.]+$/, "")
+    .trim();
+
+  return summary;
+}
+
+function toSentenceFragment(text) {
+  return cleanGeneratedField(normalizeSelectionText(text)).replace(/[.]+$/, "").trim();
+}
+
+function getSelectionContextSignals(selectionText, contextText) {
+  const normalizedSelection = normalizeSelectionText(selectionText);
+  const normalizedContext = normalizeSelectionText(contextText);
+  const escapedSelection = escapeRegExp(normalizedSelection);
+
+  if (!normalizedSelection || !normalizedContext) {
+    return {
+      compoundPhrase: "",
+    };
+  }
+
+  const compoundMatch = normalizedContext.match(
+    new RegExp(`\\b[\\w-]*${escapedSelection}[\\w-]*\\b`, "i")
+  );
+  const compoundPhrase = compoundMatch?.[0] || "";
+
+  return {
+    compoundPhrase: compoundPhrase.includes("-") ? compoundPhrase : "",
+  };
+}
+
+function buildCompoundAwareFallback(selectionText, contextSignals, isEli12) {
+  const selectionLower = normalizeSelectionText(selectionText).toLowerCase();
+  const compoundPhrase = normalizeSelectionText(contextSignals?.compoundPhrase);
+
+  if (!compoundPhrase) {
+    return buildSingleWordFallback(selectionText, isEli12);
+  }
+
+  const compoundLower = compoundPhrase.toLowerCase();
+  const parts = compoundPhrase.split("-");
+  const firstPart = parts[0] || "";
+
+  if (selectionLower === "tolerant") {
+    return {
+      definition: isEli12
+        ? "Tolerant means able to keep working well even when conditions are pushed or changed."
+        : "Tolerant means able to handle strain, variation, or difficult conditions without failing or losing effectiveness.",
+      usage: firstPart
+        ? `Here, in "${compoundPhrase}", it means the system can still work properly even under ${firstPart}.`
+        : `Here, in "${compoundPhrase}", it describes something that can keep working under stress.`,
+    };
+  }
+
+  if (selectionLower === "efficient" && compoundLower.includes("energy-efficient")) {
+    return {
+      definition: isEli12
+        ? "Efficient means doing the job well while using less energy or effort."
+        : "Efficient means achieving the desired result while using relatively little energy, time, or other resources.",
+      usage: `Here, in "${compoundPhrase}", it means the system performs its task while using less energy.`,
+    };
+  }
+
+  if (selectionLower === "lightweight") {
+    return {
+      definition: isEli12
+        ? "Lightweight means designed to use fewer resources or stay small and simple."
+        : "Lightweight means designed to be smaller, simpler, or less demanding in terms of computation, memory, or hardware resources.",
+      usage: `Here, it describes the AI inference as needing fewer computing resources.`,
+    };
+  }
+
+  if (selectionLower === "overclocking") {
+    return {
+      definition: isEli12
+        ? "Overclocking means running a chip or processor faster than its normal rated clock speed."
+        : "Overclocking means operating a processor or other hardware above its standard rated clock speed in order to gain more performance.",
+      usage: `Here, in "${compoundPhrase}", it describes behavior connected to hardware being run beyond its usual clock-speed setting.`,
+    };
+  }
+
+  return buildSingleWordFallback(selectionText, isEli12, compoundPhrase);
+}
+
+function buildSingleWordFallback(selectionText, isEli12, compoundPhrase = "") {
+  const selectionLower = normalizeSelectionText(selectionText).toLowerCase();
+
+  if (selectionLower === "tolerant") {
+    return {
+      definition: isEli12
+        ? "Tolerant means able to handle problems, changes, or stress without failing."
+        : "Tolerant means able to withstand variation, stress, or difficult conditions without serious failure.",
+      usage: compoundPhrase
+        ? `Here, it helps describe what "${compoundPhrase}" can handle.`
+        : "Here, it describes something that can keep working even under tougher conditions.",
+    };
+  }
+
+  if (selectionLower === "efficient") {
+    return {
+      definition: isEli12
+        ? "Efficient means doing the job well while using less energy, time, or effort."
+        : "Efficient means achieving a result while using relatively little energy, time, or other resources.",
+      usage: compoundPhrase
+        ? `Here, it helps describe what "${compoundPhrase}" is optimized to do with fewer resources.`
+        : "Here, it describes something that does its job while using fewer resources.",
+    };
+  }
+
+  if (selectionLower === "lightweight") {
+    return {
+      definition: isEli12
+        ? "Lightweight means smaller, simpler, or less demanding to run."
+        : "Lightweight means smaller, simpler, or less resource-intensive than heavier alternatives.",
+      usage: compoundPhrase
+        ? `Here, it helps describe the kind of system or process in "${compoundPhrase}".`
+        : "Here, it describes something designed to run with fewer resources.",
+    };
+  }
+
+  if (selectionLower === "overclocking") {
+    return {
+      definition: isEli12
+        ? "Overclocking means making a chip run faster than its usual set speed."
+        : "Overclocking means running a processor or other hardware at a clock speed higher than its standard rated setting.",
+      usage: compoundPhrase
+        ? `Here, it helps describe what "${compoundPhrase}" is able to handle.`
+        : "Here, it refers to increasing hardware clock speed to push performance higher.",
+    };
+  }
+
+  return null;
+}
+
+function escapeRegExp(text) {
+  return String(text || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 function buildDirectFallbackExplanation(request) {

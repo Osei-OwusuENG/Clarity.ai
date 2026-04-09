@@ -51,11 +51,7 @@ If you prefer not to store the API key in the extension, Clarity.AI can also tal
 - `src/extension/`: extension runtime, settings pages, result pages, styling, and icons
 - `src/backend/server.js`: local backend entry point
 - `src/backend/api/`: backend endpoints for `/api/explain` and `/api/health`
-- `README.md`, `DEPLOY.md`, `LAUNCH.md`: repo docs and release guidance
-
-## Launch assets
-
-- Suggested screenshots and a short demo outline are in `LAUNCH.md`.
+- `README.md` and `DEPLOY.md`: primary project documentation
 
 ## Configuration
 
