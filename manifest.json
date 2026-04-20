@@ -11,7 +11,7 @@
     "128": "src/extension/icons/icon128.png"
   },
   "permissions": ["storage", "contextMenus", "webNavigation"],
-  "host_permissions": ["http://*/*", "https://*/*"],
+  "host_permissions": ["http://*/*", "https://*/*", "file:///*"],
   "background": {
     "service_worker": "src/extension/background.js"
   },

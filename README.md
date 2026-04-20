@@ -86,5 +86,6 @@ This project is released under the GNU General Public License v3.0. See `LICENSE
 
 - Normal webpages provide the best context quality.
 - Direct `.pdf` URLs are redirected into Clarity.AI's bundled PDF viewer so selection and shortcuts can work there.
+- Local `file:///...pdf` files can also be redirected into the bundled viewer, but Chrome requires `Allow access to file URLs` to be enabled on the extension details page.
 - PDFs served from non-`.pdf` URLs may still need the context-menu flow, because Chrome does not expose response-header based PDF detection to this extension in a reliable redirect hook.
 - Deployment and self-hosting notes are in `DEPLOY.md`.

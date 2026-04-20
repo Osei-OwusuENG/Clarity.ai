@@ -1517,7 +1517,7 @@ function looksLikePdfUrl(url) {
   try {
     const parsedUrl = new URL(url);
 
-    if (!/^https?:$/i.test(parsedUrl.protocol)) {
+    if (!/^(?:https?|file):$/i.test(parsedUrl.protocol)) {
       return false;
     }
 
