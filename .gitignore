@@ -22,6 +22,9 @@ release/
 *.zip
 *.crx
 
+# Personal files/folders to ignore
+clarity videos/
+
 # Coverage and caches
 .cache/
 .eslintcache
