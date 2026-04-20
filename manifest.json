@@ -10,7 +10,7 @@
     "48": "src/extension/icons/icon48.png",
     "128": "src/extension/icons/icon128.png"
   },
-  "permissions": ["storage", "contextMenus"],
+  "permissions": ["storage", "contextMenus", "webNavigation"],
   "host_permissions": ["http://*/*", "https://*/*"],
   "background": {
     "service_worker": "src/extension/background.js"

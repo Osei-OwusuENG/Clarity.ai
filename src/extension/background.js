@@ -22,6 +22,7 @@ const MAX_SELECTION_LENGTH = 1500;
 const MAX_CONTEXT_LENGTH = 420;
 const CACHE_LIMIT = 60;
 const CONTEXT_MENU_ID = "clarity-explain-selection";
+const PDF_VIEWER_PAGE_PATH = "src/extension/pdfjs/web/viewer.html";
 const RESULT_STORAGE_PREFIX = "clarity-result:";
 const CACHE_SCHEMA_VERSION = "v24";
 const LOCAL_CACHE_PREFIX = `clarity-backend-cache:${CACHE_SCHEMA_VERSION}:`;
@@ -42,6 +43,12 @@ chrome.runtime.onInstalled.addListener(() => {
 chrome.runtime.onStartup.addListener(() => {
   void ensureContextMenu();
 });
+
+if (chrome.webNavigation?.onCommitted) {
+  chrome.webNavigation.onCommitted.addListener((details) => {
+    void maybeOpenPdfInClarityViewer(details);
+  });
+}
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message?.action === "GET_EXPLANATION") {
@@ -287,14 +294,22 @@ async function testBackendConnection(backendBaseUrl) {
 }
 
 async function handleContextMenuSelection(selectionText, tabId) {
-  const selection = await resolveContextMenuSelection(selectionText, tabId);
+  const { selection, anchorPoint } = await resolveContextMenuSelection(selectionText, tabId);
 
   if (!selection.text) {
-    await openResultPage({
+    const payload = {
       selection,
       selectedText: "",
       error: "No selected text was provided by the browser.",
-    });
+      source: "context-menu",
+      anchorPoint,
+    };
+
+    if (await showContextMenuResultInTab(tabId, payload)) {
+      return;
+    }
+
+    await openResultPage(payload);
     return;
   }
 
@@ -305,19 +320,33 @@ async function handleContextMenuSelection(selectionText, tabId) {
       mode: DEFAULT_MODE,
     });
 
-    await openResultPage({
+    const payload = {
       selection,
       selectedText: selection.text,
       explanation,
       source: "context-menu",
-    });
+      anchorPoint,
+    };
+
+    if (await showContextMenuResultInTab(tabId, payload)) {
+      return;
+    }
+
+    await openResultPage(payload);
   } catch (error) {
-    await openResultPage({
+    const payload = {
       selection,
       selectedText: selection.text,
       error: error.message,
       source: "context-menu",
-    });
+      anchorPoint,
+    };
+
+    if (await showContextMenuResultInTab(tabId, payload)) {
+      return;
+    }
+
+    await openResultPage(payload);
   }
 }
 
@@ -325,23 +354,39 @@ async function resolveContextMenuSelection(selectionText, tabId) {
   const fallbackSelection = normalizeSelection(selectionText);
 
   if (!tabId) {
-    return fallbackSelection;
+    return {
+      selection: fallbackSelection,
+      anchorPoint: null,
+    };
   }
 
   try {
-    const contextSelection = await requestSelectionContextFromTab(tabId);
+    const contextPayload = await requestSelectionContextFromTab(tabId);
+    const contextSelection = contextPayload?.selection || contextPayload;
+    const anchorPoint = normalizeAnchorPoint(contextPayload?.anchorPoint);
 
     if (
       contextSelection?.text &&
       normalizeSelectionText(contextSelection.text) === fallbackSelection.text
     ) {
-      return normalizeSelection(contextSelection);
+      return {
+        selection: normalizeSelection(contextSelection),
+        anchorPoint,
+      };
     }
+
+    return {
+      selection: fallbackSelection,
+      anchorPoint,
+    };
   } catch (error) {
     console.warn("Clarity.AI could not read page selection context:", error);
   }
 
-  return fallbackSelection;
+  return {
+    selection: fallbackSelection,
+    anchorPoint: null,
+  };
 }
 
 function requestSelectionContextFromTab(tabId) {
@@ -357,7 +402,44 @@ function requestSelectionContextFromTab(tabId) {
         return;
       }
 
-      resolve(response.selection || null);
+      resolve({
+        selection: response.selection || null,
+        anchorPoint: response.anchorPoint || null,
+      });
+    });
+  });
+}
+
+async function showContextMenuResultInTab(tabId, payload) {
+  if (!tabId) {
+    return false;
+  }
+
+  try {
+    const response = await sendMessageToTab(tabId, {
+      action: "SHOW_CONTEXT_MENU_RESULT",
+      selection: payload.selection,
+      explanation: payload.explanation || null,
+      error: payload.error || "",
+      mode: payload.explanation?.mode || DEFAULT_MODE,
+      anchorPoint: payload.anchorPoint || null,
+    });
+    return Boolean(response?.ok);
+  } catch (error) {
+    console.warn("Clarity.AI could not render the popup in the current tab:", error);
+    return false;
+  }
+}
+
+function sendMessageToTab(tabId, message) {
+  return new Promise((resolve, reject) => {
+    chrome.tabs.sendMessage(tabId, message, (response) => {
+      if (chrome.runtime.lastError) {
+        reject(new Error(chrome.runtime.lastError.message));
+        return;
+      }
+
+      resolve(response || null);
     });
   });
 }
@@ -395,6 +477,20 @@ function normalizeContextText(text) {
 
 function normalizeSelectionText(text) {
   return String(text || "").replace(/\s+/g, " ").trim();
+}
+
+function normalizeAnchorPoint(anchorPoint) {
+  if (
+    Number.isFinite(anchorPoint?.x) &&
+    Number.isFinite(anchorPoint?.y)
+  ) {
+    return {
+      x: anchorPoint.x,
+      y: anchorPoint.y,
+    };
+  }
+
+  return null;
 }
 
 function normalizeMode(mode) {
@@ -1386,6 +1482,91 @@ function ensureContextMenu() {
   });
 }
 
+async function maybeOpenPdfInClarityViewer(details) {
+  if (!shouldRedirectPdfNavigation(details)) {
+    return;
+  }
+
+  try {
+    await updateTabUrl(details.tabId, getPdfViewerUrl(details.url));
+  } catch (error) {
+    console.warn("Clarity.AI could not redirect the PDF tab into the custom viewer:", error);
+  }
+}
+
+function shouldRedirectPdfNavigation(details) {
+  if (!details || details.frameId !== 0 || details.tabId < 0) {
+    return false;
+  }
+
+  const navigationUrl = normalizeTabUrl(details.url);
+
+  if (!navigationUrl || isClarityExtensionUrl(navigationUrl)) {
+    return false;
+  }
+
+  return looksLikePdfUrl(navigationUrl);
+}
+
+function isClarityExtensionUrl(url) {
+  const extensionRootUrl = chrome.runtime.getURL("");
+  return String(url || "").startsWith(extensionRootUrl);
+}
+
+function looksLikePdfUrl(url) {
+  try {
+    const parsedUrl = new URL(url);
+
+    if (!/^https?:$/i.test(parsedUrl.protocol)) {
+      return false;
+    }
+
+    const pathname = parsedUrl.pathname.toLowerCase();
+
+    if (pathname.endsWith(".pdf")) {
+      return true;
+    }
+
+    const candidateQueryParams = ["file", "filename", "document", "download", "attachment", "url"];
+    return candidateQueryParams.some((paramName) =>
+      String(parsedUrl.searchParams.get(paramName) || "").toLowerCase().includes(".pdf")
+    );
+  } catch (error) {
+    return false;
+  }
+}
+
+function getPdfViewerUrl(fileUrl) {
+  try {
+    const parsedUrl = new URL(fileUrl);
+    const initialViewState = parsedUrl.hash.replace(/^#/, "");
+    parsedUrl.hash = "";
+
+    return chrome.runtime.getURL(
+      `${PDF_VIEWER_PAGE_PATH}?file=${encodeURIComponent(parsedUrl.toString())}${
+        initialViewState ? `#${initialViewState}` : ""
+      }`
+    );
+  } catch (error) {
+    return chrome.runtime.getURL(
+      `${PDF_VIEWER_PAGE_PATH}?file=${encodeURIComponent(fileUrl)}`
+    );
+  }
+}
+
+function updateTabUrl(tabId, url) {
+  return new Promise((resolve, reject) => {
+    chrome.tabs.update(tabId, { url }, (tab) => {
+      if (chrome.runtime.lastError) {
+        reject(new Error(chrome.runtime.lastError.message));
+        return;
+      }
+
+      resolve(tab);
+    });
+  });
+}
+
 function openOptionsPage() {
   return new Promise((resolve, reject) => {
     chrome.runtime.openOptionsPage(() => {
@@ -1397,6 +1578,10 @@ function openOptionsPage() {
       resolve();
     });
   });
+}
+
+function normalizeTabUrl(url) {
+  return String(url || "").trim();
 }
 
 async function openResultPage(payload) {

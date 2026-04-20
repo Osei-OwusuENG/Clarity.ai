@@ -49,14 +49,40 @@ if (chrome.storage?.onChanged) {
 
 if (chrome.runtime?.onMessage) {
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-    if (message?.action !== "GET_SELECTION_CONTEXT") {
+    if (message?.action === "GET_SELECTION_CONTEXT") {
+      sendResponse({
+        ok: true,
+        selection: getCurrentSelectionPayload() || popupState.pendingSelection,
+        anchorPoint: getPreferredAnchorPoint(),
+      });
       return false;
     }
 
-    sendResponse({
-      ok: true,
-      selection: getCurrentSelectionPayload() || popupState.pendingSelection,
-    });
+    if (message?.action === "SHOW_CONTEXT_MENU_RESULT") {
+      const selection = normalizeSelectionPayload(message.selection);
+
+      if (!selection) {
+        sendResponse({
+          ok: false,
+          error: "No selected text was provided by the browser.",
+        });
+        return false;
+      }
+
+      const anchorPoint = getPreferredAnchorPoint(message.anchorPoint);
+      updatePendingSelection(selection, anchorPoint, { keepPopupOpen: true });
+
+      void showExplanation(selection, anchorPoint, {
+        force: true,
+        mode: normalizeExplanationMode(message.mode),
+        prefetchedExplanation: normalizeExplanationPayload(message.explanation, message.mode),
+        errorMessage: message.error,
+      });
+
+      sendResponse({ ok: true });
+      return false;
+    }
+
     return false;
   });
 }
@@ -70,6 +96,21 @@ document.addEventListener("mouseup", (event) => {
     x: event.clientX,
     y: event.clientY,
   });
+});
+
+document.addEventListener("contextmenu", (event) => {
+  if (isInsidePopup(event.target)) {
+    return;
+  }
+
+  updatePendingSelection(
+    getCurrentSelectionPayload() || popupState.pendingSelection || popupState.lastSelection,
+    {
+      x: event.clientX,
+      y: event.clientY,
+    },
+    { keepPopupOpen: true }
+  );
 });
 
 document.addEventListener("keyup", (event) => {
@@ -162,7 +203,13 @@ document.addEventListener("keydown", (event) => {
 });
 
 async function showExplanation(selectionPayload, anchorPoint, options = {}) {
-  const { force = false, mode = DEFAULT_EXPLANATION_MODE, sourceExplanation = null } = options;
+  const {
+    force = false,
+    mode = DEFAULT_EXPLANATION_MODE,
+    sourceExplanation = null,
+    prefetchedExplanation = null,
+    errorMessage = "",
+  } = options;
   const selection = normalizeSelectionPayload(selectionPayload);
 
   if (!selection) {
@@ -190,6 +237,20 @@ async function showExplanation(selectionPayload, anchorPoint, options = {}) {
 
   renderLoadingState(popup, selectedText, normalizedMode);
   positionPopup(popup, anchorPoint);
+
+  if (prefetchedExplanation?.definition) {
+    popupState.cache.set(cacheKey, prefetchedExplanation);
+    trimCache(popupState.cache, CACHE_LIMIT);
+    renderExplanationState(popup, selection, prefetchedExplanation);
+    positionPopup(popup, anchorPoint);
+    return;
+  }
+
+  if (errorMessage) {
+    renderErrorState(popup, selectedText, errorMessage);
+    positionPopup(popup, anchorPoint);
+    return;
+  }
 
   if (popupState.cache.has(cacheKey)) {
     renderExplanationState(popup, selection, popupState.cache.get(cacheKey));
@@ -279,6 +340,31 @@ function updatePendingSelection(selectionPayload, anchorPoint, options = {}) {
 
 function clearPendingSelection() {
   popupState.pendingSelection = null;
+}
+
+function getPreferredAnchorPoint(preferredAnchorPoint = null) {
+  if (
+    Number.isFinite(preferredAnchorPoint?.x) &&
+    Number.isFinite(preferredAnchorPoint?.y)
+  ) {
+    return {
+      x: preferredAnchorPoint.x,
+      y: preferredAnchorPoint.y,
+    };
+  }
+
+  if (popupState.pendingSelection?.text) {
+    return { ...popupState.pendingAnchorPoint };
+  }
+
+  if (popupState.lastSelection?.text) {
+    return { ...popupState.lastAnchorPoint };
+  }
+
+  return {
+    x: Math.max(24, window.innerWidth - 408),
+    y: 24,
+  };
 }
 
 function renderLoadingState(popup, selectedText, mode) {
@@ -949,6 +1035,18 @@ function normalizeExplanationMode(mode) {
   }
 
   return DEFAULT_EXPLANATION_MODE;
+}
+
+function normalizeExplanationPayload(explanation, fallbackMode = DEFAULT_EXPLANATION_MODE) {
+  if (!explanation || typeof explanation !== "object") {
+    return null;
+  }
+
+  return {
+    definition: normalizeSelection(explanation.definition),
+    usage: normalizeSelection(explanation.usage),
+    mode: normalizeExplanationMode(explanation.mode || fallbackMode),
+  };
 }
 
 function getCachedExplanation(selection, mode, sourceExplanation = null) {

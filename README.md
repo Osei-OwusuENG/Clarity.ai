@@ -21,7 +21,8 @@ First public version.
 - Explains highlighted words, phrases, and passages in plain language
 - Uses nearby page context to make explanations more accurate
 - Includes `Explain like I'm 12` and `Explain deeply` modes
-- Supports copyable results and a context-menu flow for PDFs/browser documents
+- Supports copyable results and an in-tab context-menu popup for PDFs/browser documents, with a result-page fallback when needed
+- Redirects direct `.pdf` navigations into an extension-owned PDF viewer so text selection and the Clarity shortcut work inside supported PDFs
 - Works in `Direct Gemini (no server)` mode or with an optional self-hosted backend
 
 ## Install
@@ -62,6 +63,7 @@ If you prefer not to store the API key in the extension, Clarity.AI can also tal
 
 - `manifest.json`: extension manifest kept at the repo root so the whole repo can be loaded unpacked in Chrome
 - `src/extension/`: extension runtime, settings pages, result pages, styling, and icons
+- `src/extension/pdfjs/`: vendored PDF.js viewer assets used for the custom in-extension PDF reader
 - `src/backend/server.js`: local backend entry point
 - `src/backend/api/`: backend endpoints for `/api/explain` and `/api/health`
 - `README.md` and `DEPLOY.md`: primary project documentation
@@ -83,5 +85,6 @@ This project is released under the GNU General Public License v3.0. See `LICENSE
 ## Notes
 
 - Normal webpages provide the best context quality.
-- Native browser PDF viewers can expose less surrounding context than regular pages.
+- Direct `.pdf` URLs are redirected into Clarity.AI's bundled PDF viewer so selection and shortcuts can work there.
+- PDFs served from non-`.pdf` URLs may still need the context-menu flow, because Chrome does not expose response-header based PDF detection to this extension in a reliable redirect hook.
 - Deployment and self-hosting notes are in `DEPLOY.md`.
