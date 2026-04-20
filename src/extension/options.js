@@ -3,22 +3,35 @@ const CONNECTION_MODE_BACKEND = "backend";
 const VALID_CONNECTION_MODES = new Set([CONNECTION_MODE_DIRECT, CONNECTION_MODE_BACKEND]);
 const VALID_SHORTCUT_MODIFIERS = new Set(["none", "alt", "ctrl", "meta", "shift"]);
 
+const DIRECT_PROVIDER_GEMINI = "gemini";
+const DIRECT_PROVIDER_OPENAI_COMPATIBLE = "openai-compatible";
+const VALID_DIRECT_PROVIDERS = new Set([DIRECT_PROVIDER_GEMINI, DIRECT_PROVIDER_OPENAI_COMPATIBLE]);
+
+const DEFAULT_DIRECT_GEMINI_MODEL = "gemini-2.5-flash";
+const DEFAULT_DIRECT_OPENAI_COMPATIBLE_BASE_URL = "https://api.openai.com/v1";
+
 const SYNC_STORAGE_KEYS = {
   connectionMode: "connectionMode",
   backendBaseUrl: "backendBaseUrl",
-  directGeminiModel: "directGeminiModel",
+  directProvider: "directProvider",
+  directModel: "directModel",
+  directBaseUrl: "directBaseUrl",
+  legacyDirectGeminiModel: "directGeminiModel",
   triggerKey: "triggerShortcutKey",
   triggerModifier: "triggerShortcutModifier",
 };
 
 const LOCAL_STORAGE_KEYS = {
-  directGeminiApiKey: "directGeminiApiKey",
+  directApiKey: "directApiKey",
+  legacyDirectGeminiApiKey: "directGeminiApiKey",
 };
 
 const DEFAULT_SETTINGS = {
   connectionMode: CONNECTION_MODE_DIRECT,
-  directGeminiApiKey: "",
-  directGeminiModel: "gemini-2.5-flash",
+  directProvider: DIRECT_PROVIDER_GEMINI,
+  directApiKey: "",
+  directModel: DEFAULT_DIRECT_GEMINI_MODEL,
+  directBaseUrl: DEFAULT_DIRECT_OPENAI_COMPATIBLE_BASE_URL,
   backendBaseUrl: "http://localhost:3000",
   key: "z",
   modifier: "none",
@@ -28,8 +41,12 @@ const form = document.getElementById("settings-form");
 const connectionModeSelect = document.getElementById("connection-mode");
 const directSettingsPanel = document.getElementById("direct-settings");
 const backendSettingsPanel = document.getElementById("backend-settings");
-const directGeminiApiKeyInput = document.getElementById("direct-gemini-api-key");
-const directGeminiModelInput = document.getElementById("direct-gemini-model");
+const directProviderSelect = document.getElementById("direct-provider");
+const directApiKeyInput = document.getElementById("direct-api-key");
+const directModelInput = document.getElementById("direct-model");
+const directBaseUrlField = document.getElementById("direct-base-url-field");
+const directBaseUrlInput = document.getElementById("direct-base-url");
+const directProviderHelp = document.getElementById("direct-provider-help");
 const backendBaseUrlInput = document.getElementById("backend-base-url");
 const toggleApiKeyVisibilityButton = document.getElementById("toggle-api-key-visibility-button");
 const triggerKeyInput = document.getElementById("trigger-key");
@@ -46,9 +63,30 @@ connectionModeSelect.addEventListener("change", () => {
   updateConnectionModeUI();
 });
 
+directProviderSelect.addEventListener("change", () => {
+  const previousProvider =
+    normalizeDirectProvider(directProviderSelect.dataset.currentProvider) || DEFAULT_SETTINGS.directProvider;
+  const nextProvider = normalizeDirectProvider(directProviderSelect.value) || DEFAULT_SETTINGS.directProvider;
+  const currentModel = normalizeDirectModel(directModelInput.value);
+
+  if (!currentModel || currentModel === getDefaultDirectModel(previousProvider)) {
+    directModelInput.value = getDefaultDirectModel(nextProvider);
+  }
+
+  if (
+    nextProvider === DIRECT_PROVIDER_OPENAI_COMPATIBLE &&
+    !normalizeDirectBaseUrl(directBaseUrlInput.value)
+  ) {
+    directBaseUrlInput.value = DEFAULT_DIRECT_OPENAI_COMPATIBLE_BASE_URL;
+  }
+
+  directProviderSelect.dataset.currentProvider = nextProvider;
+  updateConnectionModeUI();
+});
+
 toggleApiKeyVisibilityButton.addEventListener("click", () => {
-  const nextType = directGeminiApiKeyInput.type === "password" ? "text" : "password";
-  directGeminiApiKeyInput.type = nextType;
+  const nextType = directApiKeyInput.type === "password" ? "text" : "password";
+  directApiKeyInput.type = nextType;
   toggleApiKeyVisibilityButton.textContent = nextType === "password" ? "Show" : "Hide";
 });
 
@@ -76,17 +114,21 @@ form.addEventListener("submit", async (event) => {
       setSyncStorageValues({
         [SYNC_STORAGE_KEYS.connectionMode]: settings.connectionMode,
         [SYNC_STORAGE_KEYS.backendBaseUrl]: settings.backendBaseUrl,
-        [SYNC_STORAGE_KEYS.directGeminiModel]: settings.directGeminiModel,
+        [SYNC_STORAGE_KEYS.directProvider]: settings.directProvider,
+        [SYNC_STORAGE_KEYS.directModel]: settings.directModel,
+        [SYNC_STORAGE_KEYS.directBaseUrl]: settings.directBaseUrl,
         [SYNC_STORAGE_KEYS.triggerKey]: settings.key,
         [SYNC_STORAGE_KEYS.triggerModifier]: settings.modifier,
       }),
       setLocalStorageValues({
-        [LOCAL_STORAGE_KEYS.directGeminiApiKey]: settings.directGeminiApiKey,
+        [LOCAL_STORAGE_KEYS.directApiKey]: settings.directApiKey,
       }),
     ]);
 
     setStatus(
-      `Saved. Mode: ${formatConnectionModeLabel(settings.connectionMode)}. Shortcut: ${formatShortcutLabel(settings)}. Reload the page you are testing on.`,
+      `Saved. Mode: ${formatConnectionModeLabel(settings.connectionMode)}. Shortcut: ${formatShortcutLabel(
+        settings
+      )}. Reload the page you are testing on.`,
       "success"
     );
   } catch (error) {
@@ -149,15 +191,16 @@ async function initialize() {
       getLocalStorageValues(Object.values(LOCAL_STORAGE_KEYS)),
     ]);
 
-    const directGeminiApiKey = normalizeApiKey(localValues[LOCAL_STORAGE_KEYS.directGeminiApiKey]);
+    const directValues = resolveStoredDirectValues(syncValues, localValues);
     const backendBaseUrl = normalizeBackendBaseUrl(syncValues[SYNC_STORAGE_KEYS.backendBaseUrl]);
     const explicitMode = normalizeConnectionMode(syncValues[SYNC_STORAGE_KEYS.connectionMode]);
 
     const settings = {
-      connectionMode: resolveConnectionMode(explicitMode, directGeminiApiKey, backendBaseUrl),
-      directGeminiApiKey,
-      directGeminiModel:
-        normalizeGeminiModel(syncValues[SYNC_STORAGE_KEYS.directGeminiModel]) || DEFAULT_SETTINGS.directGeminiModel,
+      connectionMode: resolveConnectionMode(explicitMode, directValues.directApiKey, backendBaseUrl),
+      directProvider: directValues.directProvider,
+      directApiKey: directValues.directApiKey,
+      directModel: directValues.directModel,
+      directBaseUrl: directValues.directBaseUrl,
       backendBaseUrl: backendBaseUrl || DEFAULT_SETTINGS.backendBaseUrl,
       key: normalizeShortcutKey(syncValues[SYNC_STORAGE_KEYS.triggerKey]) || DEFAULT_SETTINGS.key,
       modifier: normalizeShortcutModifier(syncValues[SYNC_STORAGE_KEYS.triggerModifier]),
@@ -172,15 +215,43 @@ async function initialize() {
   }
 }
 
+function resolveStoredDirectValues(syncValues, localValues) {
+  const directProvider = normalizeDirectProvider(syncValues[SYNC_STORAGE_KEYS.directProvider]);
+  const directModel = normalizeDirectModel(syncValues[SYNC_STORAGE_KEYS.directModel]);
+  const directBaseUrl = normalizeDirectBaseUrl(syncValues[SYNC_STORAGE_KEYS.directBaseUrl]);
+  const directApiKey = normalizeApiKey(localValues[LOCAL_STORAGE_KEYS.directApiKey]);
+  const hasModernDirectSettings = Boolean(directProvider || directModel || directBaseUrl || directApiKey);
+
+  const resolvedProvider = hasModernDirectSettings ? directProvider || DEFAULT_SETTINGS.directProvider : DIRECT_PROVIDER_GEMINI;
+  const fallbackLegacyModel = !hasModernDirectSettings
+    ? normalizeDirectModel(syncValues[SYNC_STORAGE_KEYS.legacyDirectGeminiModel])
+    : "";
+  const fallbackLegacyApiKey = !hasModernDirectSettings
+    ? normalizeApiKey(localValues[LOCAL_STORAGE_KEYS.legacyDirectGeminiApiKey])
+    : "";
+
+  return {
+    directProvider: resolvedProvider,
+    directApiKey: directApiKey || fallbackLegacyApiKey,
+    directModel: directModel || fallbackLegacyModel || getDefaultDirectModel(resolvedProvider),
+    directBaseUrl: directBaseUrl || DEFAULT_SETTINGS.directBaseUrl,
+  };
+}
+
 function getSettingsFromForm() {
-  const directGeminiApiKey = normalizeApiKey(directGeminiApiKeyInput.value);
+  const directProvider = normalizeDirectProvider(directProviderSelect.value) || DEFAULT_SETTINGS.directProvider;
+  const directApiKey = normalizeApiKey(directApiKeyInput.value);
+  const directModel = normalizeDirectModel(directModelInput.value) || getDefaultDirectModel(directProvider);
+  const directBaseUrl = normalizeDirectBaseUrl(directBaseUrlInput.value) || DEFAULT_SETTINGS.directBaseUrl;
   const backendBaseUrl = normalizeBackendBaseUrl(backendBaseUrlInput.value);
   const explicitMode = normalizeConnectionMode(connectionModeSelect.value);
 
   return {
-    connectionMode: resolveConnectionMode(explicitMode, directGeminiApiKey, backendBaseUrl),
-    directGeminiApiKey,
-    directGeminiModel: normalizeGeminiModel(directGeminiModelInput.value) || DEFAULT_SETTINGS.directGeminiModel,
+    connectionMode: resolveConnectionMode(explicitMode, directApiKey, backendBaseUrl),
+    directProvider,
+    directApiKey,
+    directModel,
+    directBaseUrl,
     backendBaseUrl,
     key: sanitizeShortcutKeyInput(triggerKeyInput.value),
     modifier: normalizeShortcutModifier(triggerModifierSelect.value),
@@ -189,10 +260,14 @@ function getSettingsFromForm() {
 
 function applySettingsToForm(settings) {
   connectionModeSelect.value = settings.connectionMode;
-  directGeminiApiKeyInput.value = settings.directGeminiApiKey;
-  directGeminiModelInput.value = settings.directGeminiModel;
+  directProviderSelect.value = settings.directProvider;
+  directProviderSelect.dataset.currentProvider = settings.directProvider;
+  directApiKeyInput.value = settings.directApiKey;
+  directModelInput.value = settings.directModel;
+  directBaseUrlInput.value = settings.directBaseUrl;
   backendBaseUrlInput.value = settings.backendBaseUrl;
   applyShortcutToForm(settings);
+  updateDirectProviderUI();
 }
 
 function applyShortcutToForm(shortcut) {
@@ -207,7 +282,29 @@ function updateConnectionModeUI() {
   directSettingsPanel.hidden = !isDirectMode;
   backendSettingsPanel.hidden = isDirectMode;
   useLocalBackendButton.hidden = isDirectMode;
-  testConnectionButton.textContent = isDirectMode ? "Test direct mode" : "Test backend";
+
+  if (isDirectMode) {
+    updateDirectProviderUI();
+    testConnectionButton.textContent = `Test ${formatDirectProviderLabel(
+      normalizeDirectProvider(directProviderSelect.value) || DEFAULT_SETTINGS.directProvider
+    )}`;
+    return;
+  }
+
+  testConnectionButton.textContent = "Test backend";
+}
+
+function updateDirectProviderUI() {
+  const directProvider = normalizeDirectProvider(directProviderSelect.value) || DEFAULT_SETTINGS.directProvider;
+  const isOpenAICompatible = directProvider === DIRECT_PROVIDER_OPENAI_COMPATIBLE;
+
+  directBaseUrlField.hidden = !isOpenAICompatible;
+  directApiKeyInput.placeholder = directProvider === DIRECT_PROVIDER_GEMINI ? "AIza..." : "sk-...";
+  directModelInput.placeholder =
+    directProvider === DIRECT_PROVIDER_GEMINI ? DEFAULT_DIRECT_GEMINI_MODEL : "your-provider-model";
+  directProviderHelp.textContent = isOpenAICompatible
+    ? "OpenAI-compatible mode sends POST /chat/completions requests to the base URL below."
+    : "Gemini mode uses Google's native Gemini API directly from the extension.";
 }
 
 function updateShortcutPreview() {
@@ -224,17 +321,30 @@ function validateSettings(settings) {
   }
 
   if (settings.connectionMode === CONNECTION_MODE_DIRECT) {
-    if (!settings.directGeminiApiKey) {
+    if (!settings.directApiKey) {
       return {
         message: "Add your API key for direct mode.",
-        focusTarget: directGeminiApiKeyInput,
+        focusTarget: directApiKeyInput,
       };
     }
 
-    if (!settings.directGeminiModel) {
+    if (!settings.directModel) {
       return {
-        message: "Add a Gemini model name such as gemini-2.5-flash.",
-        focusTarget: directGeminiModelInput,
+        message:
+          settings.directProvider === DIRECT_PROVIDER_OPENAI_COMPATIBLE
+            ? "Add an OpenAI-compatible model name."
+            : "Add a Gemini model name such as gemini-2.5-flash.",
+        focusTarget: directModelInput,
+      };
+    }
+
+    if (
+      settings.directProvider === DIRECT_PROVIDER_OPENAI_COMPATIBLE &&
+      !settings.directBaseUrl
+    ) {
+      return {
+        message: "Add a base URL such as https://api.openai.com/v1.",
+        focusTarget: directBaseUrlInput,
       };
     }
 
@@ -255,6 +365,10 @@ function formatConnectionModeLabel(connectionMode) {
   return connectionMode === CONNECTION_MODE_BACKEND ? "Self-hosted backend" : "Direct mode";
 }
 
+function formatDirectProviderLabel(directProvider) {
+  return directProvider === DIRECT_PROVIDER_OPENAI_COMPATIBLE ? "OpenAI-compatible" : "Gemini";
+}
+
 function formatShortcutLabel(shortcut) {
   const key = (shortcut.key || DEFAULT_SETTINGS.key).toUpperCase();
 
@@ -273,12 +387,16 @@ function formatShortcutLabel(shortcut) {
   }
 }
 
-function resolveConnectionMode(explicitMode, directGeminiApiKey, backendBaseUrl) {
+function getDefaultDirectModel(directProvider) {
+  return directProvider === DIRECT_PROVIDER_GEMINI ? DEFAULT_DIRECT_GEMINI_MODEL : "";
+}
+
+function resolveConnectionMode(explicitMode, directApiKey, backendBaseUrl) {
   if (VALID_CONNECTION_MODES.has(explicitMode)) {
     return explicitMode;
   }
 
-  if (directGeminiApiKey) {
+  if (directApiKey) {
     return CONNECTION_MODE_DIRECT;
   }
 
@@ -294,14 +412,23 @@ function normalizeConnectionMode(value) {
   return VALID_CONNECTION_MODES.has(normalizedValue) ? normalizedValue : "";
 }
 
+function normalizeDirectProvider(value) {
+  const normalizedValue = String(value || "").trim().toLowerCase();
+  return VALID_DIRECT_PROVIDERS.has(normalizedValue) ? normalizedValue : "";
+}
+
 function normalizeBackendBaseUrl(value) {
   const normalizedValue = String(value || "").trim().replace(/\/+$/, "");
   return /^https?:\/\/[^\s/$.?#].[^\s]*$/i.test(normalizedValue) ? normalizedValue : "";
 }
 
-function normalizeGeminiModel(value) {
+function normalizeDirectBaseUrl(value) {
+  return normalizeBackendBaseUrl(value);
+}
+
+function normalizeDirectModel(value) {
   const normalizedValue = String(value || "").trim();
-  return /^[a-z0-9][a-z0-9._-]{1,80}$/i.test(normalizedValue) ? normalizedValue : "";
+  return /^[^\s]{1,120}$/i.test(normalizedValue) ? normalizedValue : "";
 }
 
 function normalizeApiKey(value) {

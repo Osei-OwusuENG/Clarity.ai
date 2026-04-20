@@ -1,19 +1,33 @@
 # Self-Hosting Clarity.AI
 
-Most people do not need a backend. Clarity.AI works out of the box in `Direct Gemini (no server)` mode, which is the simplest setup.
+Most people do not need a backend. Clarity.AI works out of the box in direct mode, which is the simplest setup.
 
 Use the backend only if you want the API key to live on a server instead of inside the extension, or if you want tighter control over which extension origins can call it.
 
 ## Run it locally
 
 1. Copy `.env.example` to `.env`.
-2. Add your Gemini key:
+2. Choose a provider:
 
-   `GEMINI_API_KEY=your_real_gemini_key`
+   `AI_PROVIDER=gemini`
 
-3. Optionally change the other settings in `.env`:
+   or
 
-   `GEMINI_MODEL=gemini-2.5-flash`
+   `AI_PROVIDER=openai-compatible`
+
+3. Add your API key:
+
+   `AI_API_KEY=your_real_key`
+
+4. Add a model if needed:
+
+   `AI_MODEL=your_provider_model`
+
+5. If you chose `openai-compatible`, also add a base URL:
+
+   `AI_BASE_URL=https://api.openai.com/v1`
+
+6. Optionally change the other settings in `.env`:
 
    `PORT=3000`
 
@@ -21,12 +35,17 @@ Use the backend only if you want the API key to live on a server instead of insi
 
    `CLARITY_LOG_PROMPT_METRICS=false`
 
-4. Start the backend:
+7. Start the backend:
 
    `npm run dev`
 
-5. Open `http://localhost:3000/api/health` and make sure it returns `ok: true`.
-6. In the extension settings, switch to `Self-hosted backend`, set the backend URL to `http://localhost:3000`, save, and use `Test backend`.
+8. Open `http://localhost:3000/api/health` and make sure it returns `ok: true`.
+9. In the extension settings, switch to `Self-hosted backend`, set the backend URL to `http://localhost:3000`, save, and use `Test backend`.
+
+Legacy Gemini envs still work:
+
+- `GEMINI_API_KEY`
+- `GEMINI_MODEL`
 
 ## Deploy it elsewhere
 

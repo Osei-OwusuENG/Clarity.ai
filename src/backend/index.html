@@ -88,7 +88,7 @@
 
       <section class="card">
         <p class="label">Quick Start</p>
-        <p>1. Add your Gemini key to <code>.env</code>.</p>
+        <p>1. Add your AI provider settings to <code>.env</code>.</p>
         <p>2. Keep the extension backend URL at <code>http://localhost:3000</code>.</p>
         <p>3. Use the settings page to test <code>/api/health</code>.</p>
       </section>
@@ -113,10 +113,10 @@
             throw new Error("Health check failed.");
           }
 
-          statusElement.dataset.state = data.hasGeminiKey ? "ok" : "error";
-          statusElement.textContent = data.hasGeminiKey
-            ? `Healthy. Model: ${data.model}`
-            : "Server is reachable, but GEMINI_API_KEY is missing in .env.";
+          statusElement.dataset.state = data.ready ? "ok" : "error";
+          statusElement.textContent = data.ready
+            ? `Healthy. Provider: ${data.providerLabel}. Model: ${data.model}`
+            : data.configurationMessage || "Server is reachable, but the AI provider is not configured.";
         } catch (error) {
           statusElement.dataset.state = "error";
           statusElement.textContent = "Could not reach /api/health.";

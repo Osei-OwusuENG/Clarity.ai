@@ -4,12 +4,21 @@ const VALID_CONNECTION_MODES = new Set([CONNECTION_MODE_DIRECT, CONNECTION_MODE_
 
 const CONNECTION_MODE_STORAGE_KEY = "connectionMode";
 const BACKEND_URL_STORAGE_KEY = "backendBaseUrl";
-const DIRECT_GEMINI_MODEL_STORAGE_KEY = "directGeminiModel";
-const DIRECT_GEMINI_API_KEY_STORAGE_KEY = "directGeminiApiKey";
+const DIRECT_PROVIDER_STORAGE_KEY = "directProvider";
+const DIRECT_MODEL_STORAGE_KEY = "directModel";
+const DIRECT_API_KEY_STORAGE_KEY = "directApiKey";
+const DIRECT_BASE_URL_STORAGE_KEY = "directBaseUrl";
+const LEGACY_DIRECT_GEMINI_MODEL_STORAGE_KEY = "directGeminiModel";
+const LEGACY_DIRECT_GEMINI_API_KEY_STORAGE_KEY = "directGeminiApiKey";
 
 const DEFAULT_BACKEND_BASE_URL = "http://localhost:3000";
+const DIRECT_PROVIDER_GEMINI = "gemini";
+const DIRECT_PROVIDER_OPENAI_COMPATIBLE = "openai-compatible";
+const VALID_DIRECT_PROVIDERS = new Set([DIRECT_PROVIDER_GEMINI, DIRECT_PROVIDER_OPENAI_COMPATIBLE]);
+const DEFAULT_DIRECT_PROVIDER = DIRECT_PROVIDER_GEMINI;
 const DEFAULT_DIRECT_GEMINI_MODEL = "gemini-2.5-flash";
-const DIRECT_GEMINI_SYSTEM_INSTRUCTION = [
+const DEFAULT_DIRECT_OPENAI_COMPATIBLE_BASE_URL = "https://api.openai.com/v1";
+const DIRECT_SYSTEM_INSTRUCTION = [
   "You are Clarity.AI, a helpful learning assistant.",
   "Explain highlighted text clearly, naturally, and in plain English.",
   "Focus on what the text means and what it means in the context provided.",
@@ -144,7 +153,9 @@ async function handleExplanationRequest(requestInput) {
 
 async function requestExplanationWithConfiguredConnection(request, connectionSettings) {
   if (connectionSettings.connectionMode === CONNECTION_MODE_DIRECT) {
-    return requestDirectGeminiExplanation(request, connectionSettings);
+    return connectionSettings.directProvider === DIRECT_PROVIDER_OPENAI_COMPATIBLE
+      ? requestDirectOpenAICompatibleExplanation(request, connectionSettings)
+      : requestDirectGeminiExplanation(request, connectionSettings);
   }
 
   return requestBackendExplanation(request, connectionSettings.backendBaseUrl);
@@ -217,6 +228,40 @@ async function requestDirectGeminiExplanation(request, connectionSettings) {
   return explanation?.definition ? explanation : buildDirectFallbackExplanation(request);
 }
 
+async function requestDirectOpenAICompatibleExplanation(request, connectionSettings) {
+  let response;
+
+  try {
+    response = await fetch(getDirectOpenAICompatibleEndpoint(connectionSettings.directBaseUrl), {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${connectionSettings.directApiKey}`,
+      },
+      body: JSON.stringify(buildDirectOpenAICompatibleRequestBody(request, connectionSettings.directModel)),
+    });
+  } catch (error) {
+    throw new Error(
+      "Clarity.AI could not reach the OpenAI-compatible endpoint. Check the base URL, internet connection, and API key."
+    );
+  }
+
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    console.warn("Clarity.AI OpenAI-compatible error:", {
+      status: response.status,
+      error: data?.error || null,
+      model: connectionSettings.directModel,
+      baseUrl: connectionSettings.directBaseUrl,
+    });
+    throw new Error(normalizeDirectOpenAICompatibleError(response.status, data?.error || data));
+  }
+
+  const explanation = extractExplanationFromOpenAICompatibleResponse(data, request);
+  return explanation?.definition ? explanation : buildDirectFallbackExplanation(request);
+}
+
 async function testConnection(inputSettings) {
   const connectionSettings = inputSettings
     ? normalizeConnectionSettings(inputSettings)
@@ -228,10 +273,15 @@ async function testConnection(inputSettings) {
   }
 
   if (connectionSettings.connectionMode === CONNECTION_MODE_DIRECT) {
-    await testDirectGeminiConnection(connectionSettings);
+    if (connectionSettings.directProvider === DIRECT_PROVIDER_OPENAI_COMPATIBLE) {
+      await testDirectOpenAICompatibleConnection(connectionSettings);
+    } else {
+      await testDirectGeminiConnection(connectionSettings);
+    }
+
     return {
       state: "success",
-      message: `Gemini is reachable. Model: ${connectionSettings.directGeminiModel}.`,
+      message: `${formatDirectProviderLabel(connectionSettings.directProvider)} is reachable. Model: ${connectionSettings.directModel}.`,
     };
   }
 
@@ -268,6 +318,39 @@ async function testDirectGeminiConnection(connectionSettings) {
   return data;
 }
 
+async function testDirectOpenAICompatibleConnection(connectionSettings) {
+  let response;
+
+  try {
+    response = await fetch(getDirectOpenAICompatibleEndpoint(connectionSettings.directBaseUrl), {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${connectionSettings.directApiKey}`,
+      },
+      body: JSON.stringify(buildDirectOpenAICompatibleTestRequestBody(connectionSettings.directModel)),
+    });
+  } catch (error) {
+    throw new Error(
+      "Clarity.AI could not reach the OpenAI-compatible endpoint. Check the base URL, internet connection, and API key."
+    );
+  }
+
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    console.warn("Clarity.AI OpenAI-compatible test error:", {
+      status: response.status,
+      error: data?.error || null,
+      model: connectionSettings.directModel,
+      baseUrl: connectionSettings.directBaseUrl,
+    });
+    throw new Error(normalizeDirectOpenAICompatibleError(response.status, data?.error || data));
+  }
+
+  return data;
+}
+
 async function testBackendConnection(backendBaseUrl) {
   let response;
 
@@ -283,13 +366,13 @@ async function testBackendConnection(backendBaseUrl) {
     throw new Error("The backend health check failed.");
   }
 
-  if (!data.hasGeminiKey) {
-    throw new Error("Backend is reachable, but GEMINI_API_KEY is missing in .env.");
+  if (!data.ready || !data.hasApiKey) {
+    throw new Error(data.configurationMessage || "Backend is reachable, but the AI provider is not configured.");
   }
 
   return {
     state: "success",
-    message: `Backend is reachable. Model: ${data.model}.`,
+    message: `Backend is reachable. Provider: ${data.providerLabel || formatDirectProviderLabel(data.provider)}. Model: ${data.model}.`,
   };
 }
 
@@ -598,6 +681,46 @@ function normalizeDirectGeminiError(status, errorPayload) {
   return combinedMessage || "Gemini could not generate an explanation right now. Please try again.";
 }
 
+function normalizeDirectOpenAICompatibleError(status, errorPayload) {
+  const providerError =
+    errorPayload && typeof errorPayload === "object"
+      ? errorPayload
+      : {
+          message: String(errorPayload || ""),
+        };
+  const message = normalizeSelectionText(
+    providerError.message || providerError.error?.message || providerError.detail || providerError.type || ""
+  );
+  const code = normalizeSelectionText(providerError.code || providerError.type);
+  const combinedMessage = [code, message].filter(Boolean).join(" ").trim();
+
+  if (/api key|incorrect api key|invalid api key|unauthorized|authentication|forbidden|bearer/i.test(combinedMessage)) {
+    return "The provider rejected the API key. Open Clarity.AI settings and check it.";
+  }
+
+  if (/model.*not found|unknown model|invalid model|does not exist|unsupported model/i.test(combinedMessage)) {
+    return "The provider rejected the model name. Check the model in Clarity.AI settings.";
+  }
+
+  if (status === 404) {
+    return "The provider base URL looks wrong. Check the direct mode base URL in Clarity.AI settings.";
+  }
+
+  if (status === 429) {
+    return "The provider rate limit or quota was hit. Try again later or check billing/quota.";
+  }
+
+  if (status === 400) {
+    return combinedMessage || "The provider rejected the request. Check the direct settings and try again.";
+  }
+
+  return combinedMessage || "The provider could not generate an explanation right now. Please try again.";
+}
+
+function formatDirectProviderLabel(directProvider) {
+  return directProvider === DIRECT_PROVIDER_OPENAI_COMPATIBLE ? "OpenAI-compatible provider" : "Gemini";
+}
+
 function getGeminiErrorDetailsText(details) {
   if (!Array.isArray(details) || !details.length) {
     return "";
@@ -657,7 +780,12 @@ function getRequestCacheSignature(request, transportSignature) {
 
 function getTransportSignature(connectionSettings) {
   if (connectionSettings.connectionMode === CONNECTION_MODE_DIRECT) {
-    return `${CONNECTION_MODE_DIRECT}:${connectionSettings.directGeminiModel}`;
+    return [
+      CONNECTION_MODE_DIRECT,
+      connectionSettings.directProvider,
+      connectionSettings.directModel,
+      connectionSettings.directProvider === DIRECT_PROVIDER_OPENAI_COMPATIBLE ? connectionSettings.directBaseUrl : "",
+    ].join(":");
   }
 
   return `${CONNECTION_MODE_BACKEND}:${connectionSettings.backendBaseUrl}`;
@@ -665,12 +793,21 @@ function getTransportSignature(connectionSettings) {
 
 function getConnectionValidationError(connectionSettings) {
   if (connectionSettings.connectionMode === CONNECTION_MODE_DIRECT) {
-    if (!connectionSettings.directGeminiApiKey) {
-      return "Open Clarity.AI settings and add your Gemini API key, or switch to backend mode.";
+    if (!connectionSettings.directApiKey) {
+      return "Open Clarity.AI settings and add your direct-mode API key, or switch to backend mode.";
     }
 
-    if (!connectionSettings.directGeminiModel) {
-      return "Open Clarity.AI settings and add a Gemini model name such as gemini-2.5-flash.";
+    if (!connectionSettings.directModel) {
+      return connectionSettings.directProvider === DIRECT_PROVIDER_OPENAI_COMPATIBLE
+        ? "Open Clarity.AI settings and add an OpenAI-compatible model name."
+        : "Open Clarity.AI settings and add a Gemini model name such as gemini-2.5-flash.";
+    }
+
+    if (
+      connectionSettings.directProvider === DIRECT_PROVIDER_OPENAI_COMPATIBLE &&
+      !connectionSettings.directBaseUrl
+    ) {
+      return "Open Clarity.AI settings and add a base URL such as https://api.openai.com/v1.";
     }
 
     return "";
@@ -688,48 +825,81 @@ async function getStoredConnectionSettings() {
     getSyncStorageValues([
       CONNECTION_MODE_STORAGE_KEY,
       BACKEND_URL_STORAGE_KEY,
-      DIRECT_GEMINI_MODEL_STORAGE_KEY,
+      DIRECT_PROVIDER_STORAGE_KEY,
+      DIRECT_MODEL_STORAGE_KEY,
+      DIRECT_BASE_URL_STORAGE_KEY,
+      LEGACY_DIRECT_GEMINI_MODEL_STORAGE_KEY,
     ]),
     getLocalStorageValues([
-      DIRECT_GEMINI_API_KEY_STORAGE_KEY,
+      DIRECT_API_KEY_STORAGE_KEY,
+      LEGACY_DIRECT_GEMINI_API_KEY_STORAGE_KEY,
       BACKEND_URL_STORAGE_KEY,
       CONNECTION_MODE_STORAGE_KEY,
-      DIRECT_GEMINI_MODEL_STORAGE_KEY,
+      DIRECT_PROVIDER_STORAGE_KEY,
+      DIRECT_MODEL_STORAGE_KEY,
+      DIRECT_BASE_URL_STORAGE_KEY,
+      LEGACY_DIRECT_GEMINI_MODEL_STORAGE_KEY,
     ]),
   ]);
+
+  const storedDirectProvider = syncValues[DIRECT_PROVIDER_STORAGE_KEY] || localValues[DIRECT_PROVIDER_STORAGE_KEY];
+  const storedDirectModel = syncValues[DIRECT_MODEL_STORAGE_KEY] || localValues[DIRECT_MODEL_STORAGE_KEY];
+  const storedDirectBaseUrl = syncValues[DIRECT_BASE_URL_STORAGE_KEY] || localValues[DIRECT_BASE_URL_STORAGE_KEY];
+  const storedDirectApiKey = localValues[DIRECT_API_KEY_STORAGE_KEY];
+  const hasModernDirectSettings = Boolean(
+    normalizeDirectProvider(storedDirectProvider) ||
+      normalizeDirectModel(storedDirectModel) ||
+      normalizeBackendBaseUrl(storedDirectBaseUrl) ||
+      normalizeApiKey(storedDirectApiKey)
+  );
 
   return normalizeConnectionSettings({
     connectionMode: syncValues[CONNECTION_MODE_STORAGE_KEY] || localValues[CONNECTION_MODE_STORAGE_KEY],
     backendBaseUrl: syncValues[BACKEND_URL_STORAGE_KEY] || localValues[BACKEND_URL_STORAGE_KEY],
-    directGeminiModel:
-      syncValues[DIRECT_GEMINI_MODEL_STORAGE_KEY] || localValues[DIRECT_GEMINI_MODEL_STORAGE_KEY],
-    directGeminiApiKey: localValues[DIRECT_GEMINI_API_KEY_STORAGE_KEY],
+    directProvider: hasModernDirectSettings ? storedDirectProvider : DIRECT_PROVIDER_GEMINI,
+    directModel:
+      storedDirectModel ||
+      (!hasModernDirectSettings
+        ? syncValues[LEGACY_DIRECT_GEMINI_MODEL_STORAGE_KEY] || localValues[LEGACY_DIRECT_GEMINI_MODEL_STORAGE_KEY]
+        : ""),
+    directBaseUrl: storedDirectBaseUrl,
+    directApiKey:
+      storedDirectApiKey ||
+      (!hasModernDirectSettings ? localValues[LEGACY_DIRECT_GEMINI_API_KEY_STORAGE_KEY] : ""),
   });
 }
 
 function normalizeConnectionSettings(input) {
-  const directGeminiApiKey = normalizeApiKey(input?.directGeminiApiKey);
+  const directProvider = normalizeDirectProvider(input?.directProvider) || DEFAULT_DIRECT_PROVIDER;
+  const directApiKey = normalizeApiKey(input?.directApiKey ?? input?.directGeminiApiKey);
   const backendBaseUrl = normalizeBackendBaseUrl(input?.backendBaseUrl);
   const connectionMode = resolveConnectionMode(
     normalizeConnectionMode(input?.connectionMode || input?.mode),
-    directGeminiApiKey,
+    directApiKey,
     backendBaseUrl
   );
+  const directModel =
+    normalizeDirectModel(input?.directModel || input?.directGeminiModel) || getDefaultDirectModel(directProvider);
 
   return {
     connectionMode,
-    directGeminiApiKey,
-    directGeminiModel: normalizeGeminiModel(input?.directGeminiModel) || DEFAULT_DIRECT_GEMINI_MODEL,
+    directProvider,
+    directApiKey,
+    directModel,
+    directBaseUrl:
+      normalizeBackendBaseUrl(input?.directBaseUrl) || DEFAULT_DIRECT_OPENAI_COMPATIBLE_BASE_URL,
+    directGeminiApiKey: directApiKey,
+    directGeminiModel: directModel,
     backendBaseUrl: backendBaseUrl || DEFAULT_BACKEND_BASE_URL,
   };
 }
 
-function resolveConnectionMode(explicitMode, directGeminiApiKey, backendBaseUrl) {
+function resolveConnectionMode(explicitMode, directApiKey, backendBaseUrl) {
   if (VALID_CONNECTION_MODES.has(explicitMode)) {
     return explicitMode;
   }
 
-  if (directGeminiApiKey) {
+  if (directApiKey) {
     return CONNECTION_MODE_DIRECT;
   }
 
@@ -745,14 +915,23 @@ function normalizeConnectionMode(value) {
   return VALID_CONNECTION_MODES.has(normalizedValue) ? normalizedValue : "";
 }
 
+function normalizeDirectProvider(value) {
+  const normalizedValue = String(value || "").trim().toLowerCase();
+  return VALID_DIRECT_PROVIDERS.has(normalizedValue) ? normalizedValue : "";
+}
+
 function normalizeBackendBaseUrl(value) {
   const normalizedValue = String(value || "").trim().replace(/\/+$/, "");
   return /^https?:\/\/[^\s/$.?#].[^\s]*$/i.test(normalizedValue) ? normalizedValue : "";
 }
 
-function normalizeGeminiModel(value) {
+function normalizeDirectModel(value) {
   const normalizedValue = String(value || "").trim();
-  return /^[a-z0-9][a-z0-9._-]{1,80}$/i.test(normalizedValue) ? normalizedValue : "";
+  return /^[^\s]{1,120}$/i.test(normalizedValue) ? normalizedValue : "";
+}
+
+function getDefaultDirectModel(directProvider) {
+  return directProvider === DIRECT_PROVIDER_GEMINI ? DEFAULT_DIRECT_GEMINI_MODEL : "";
 }
 
 function normalizeApiKey(value) {
@@ -768,7 +947,7 @@ function buildDirectGeminiRequestBody(request) {
     systemInstruction: {
       parts: [
         {
-          text: DIRECT_GEMINI_SYSTEM_INSTRUCTION,
+          text: DIRECT_SYSTEM_INSTRUCTION,
         },
       ],
     },
@@ -795,7 +974,7 @@ function buildDirectGeminiTestRequestBody() {
     systemInstruction: {
       parts: [
         {
-          text: DIRECT_GEMINI_SYSTEM_INSTRUCTION,
+          text: DIRECT_SYSTEM_INSTRUCTION,
         },
       ],
     },
@@ -831,6 +1010,46 @@ function getGeminiResponseSchema() {
       },
     },
     required: ["definition", "usage"],
+  };
+}
+
+function getDirectOpenAICompatibleEndpoint(baseUrl) {
+  return `${baseUrl.replace(/\/+$/, "")}/chat/completions`;
+}
+
+function buildDirectOpenAICompatibleRequestBody(request, model) {
+  return {
+    model,
+    messages: [
+      {
+        role: "system",
+        content: DIRECT_SYSTEM_INSTRUCTION,
+      },
+      {
+        role: "user",
+        content: buildDirectPrompt(request),
+      },
+    ],
+    temperature: getDirectTemperatureForMode(request.mode),
+    max_tokens: getDirectMaxOutputTokensForMode(request.mode),
+  };
+}
+
+function buildDirectOpenAICompatibleTestRequestBody(model) {
+  return {
+    model,
+    messages: [
+      {
+        role: "system",
+        content: DIRECT_SYSTEM_INSTRUCTION,
+      },
+      {
+        role: "user",
+        content: 'Return JSON with definition "ok" and usage "ok".',
+      },
+    ],
+    temperature: 0,
+    max_tokens: 32,
   };
 }
 
@@ -958,6 +1177,70 @@ function extractExplanationFromGeminiResponse(data, request) {
   }
 
   return explanation;
+}
+
+function extractExplanationFromOpenAICompatibleResponse(data, request) {
+  const rawText = extractChatMessageText(data?.choices?.[0]?.message?.content);
+
+  if (!rawText) {
+    return buildDirectFallbackExplanation(request);
+  }
+
+  const parsed = parseExplanationFromRawText(rawText);
+  const explanation = sanitizeGeneratedExplanation(parsed, request);
+
+  if (!explanation?.definition) {
+    return buildDirectFallbackExplanation(request);
+  }
+
+  return explanation;
+}
+
+function extractChatMessageText(content) {
+  if (typeof content === "string") {
+    return content.trim();
+  }
+
+  if (Array.isArray(content)) {
+    return content
+      .map((part) => {
+        if (typeof part === "string") {
+          return part;
+        }
+
+        if (!part || typeof part !== "object") {
+          return "";
+        }
+
+        if (typeof part.text === "string") {
+          return part.text;
+        }
+
+        if (typeof part.text?.value === "string") {
+          return part.text.value;
+        }
+
+        if (typeof part.content === "string") {
+          return part.content;
+        }
+
+        return "";
+      })
+      .join("")
+      .trim();
+  }
+
+  if (content && typeof content === "object") {
+    if (typeof content.text === "string") {
+      return content.text.trim();
+    }
+
+    if (typeof content.text?.value === "string") {
+      return content.text.value.trim();
+    }
+  }
+
+  return "";
 }
 
 function parseExplanationFromRawText(rawText) {

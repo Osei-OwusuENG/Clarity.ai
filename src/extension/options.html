@@ -32,12 +32,20 @@
             </label>
 
             <div id="direct-settings" class="connection-panel" data-mode="direct">
-              <label class="field" for="direct-gemini-api-key">
+              <label class="field" for="direct-provider">
+                <span class="field-label">Provider</span>
+                <select id="direct-provider" name="directProvider">
+                  <option value="gemini">Google Gemini</option>
+                  <option value="openai-compatible">OpenAI-compatible</option>
+                </select>
+              </label>
+
+              <label class="field" for="direct-api-key">
                 <span class="field-label">API key</span>
                 <div class="secure-input-row">
                   <input
-                    id="direct-gemini-api-key"
-                    name="directGeminiApiKey"
+                    id="direct-api-key"
+                    name="directApiKey"
                     type="password"
                     inputmode="text"
                     autocomplete="off"
@@ -50,11 +58,11 @@
                 </div>
               </label>
 
-              <label class="field" for="direct-gemini-model">
+              <label class="field" for="direct-model">
                 <span class="field-label">Model</span>
                 <input
-                  id="direct-gemini-model"
-                  name="directGeminiModel"
+                  id="direct-model"
+                  name="directModel"
                   type="text"
                   inputmode="text"
                   autocomplete="off"
@@ -62,6 +70,23 @@
                   placeholder="gemini-2.5-flash"
                 />
               </label>
+
+              <label id="direct-base-url-field" class="field" for="direct-base-url" hidden>
+                <span class="field-label">Base URL</span>
+                <input
+                  id="direct-base-url"
+                  name="directBaseUrl"
+                  type="url"
+                  inputmode="url"
+                  autocomplete="off"
+                  spellcheck="false"
+                  placeholder="https://api.openai.com/v1"
+                />
+              </label>
+
+              <p id="direct-provider-help" class="settings-help">
+                Gemini mode uses Google's native Gemini API directly from the extension.
+              </p>
             </div>
 
             <div id="backend-settings" class="connection-panel" data-mode="backend" hidden>

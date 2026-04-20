@@ -1,3 +1,5 @@
+const { getProviderHealth } = require("./provider-config");
+
 module.exports = function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
@@ -12,11 +14,11 @@ module.exports = function handler(req, res) {
     .split(",")
     .map((value) => value.trim())
     .filter(Boolean);
+  const providerHealth = getProviderHealth();
 
   res.status(200).json({
     ok: true,
-    hasGeminiKey: Boolean(process.env.GEMINI_API_KEY),
-    model: process.env.GEMINI_MODEL || "gemini-2.5-flash",
+    ...providerHealth,
     allowedOrigins,
     uptimeSeconds: Math.round(process.uptime()),
   });

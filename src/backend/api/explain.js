@@ -16,6 +16,16 @@ const SYSTEM_INSTRUCTION = [
   "Never mention prompts, JSON, field names, or formatting instructions.",
 ].join("\n");
 
+const {
+  AI_PROVIDER_GEMINI,
+  AI_PROVIDER_OPENAI_COMPATIBLE,
+  getConfiguredApiKey,
+  getConfiguredBaseUrl,
+  getConfiguredModel,
+  getConfiguredProvider,
+  getProviderConfigurationError,
+} = require("./provider-config");
+
 function createRequestId() {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 }
@@ -46,16 +56,12 @@ function logPromptMetrics(requestId, request, metrics) {
   });
 }
 
-function getGeminiModel() {
-  return String(process.env.GEMINI_MODEL || "").trim() || "gemini-2.5-flash";
-}
-
-function getGeminiApiKey() {
-  return String(process.env.GEMINI_API_KEY || "").trim();
-}
-
 function getGeminiApiEndpoint() {
-  return `https://generativelanguage.googleapis.com/v1beta/models/${getGeminiModel()}:generateContent`;
+  return `https://generativelanguage.googleapis.com/v1beta/models/${getConfiguredModel(process.env, AI_PROVIDER_GEMINI)}:generateContent`;
+}
+
+function getOpenAICompatibleApiEndpoint() {
+  return `${getConfiguredBaseUrl(process.env, AI_PROVIDER_OPENAI_COMPATIBLE).replace(/\/+$/, "")}/chat/completions`;
 }
 
 function shouldLogPromptMetrics() {
@@ -132,13 +138,19 @@ module.exports = async function handler(req, res) {
     return;
   }
 
-  if (!getGeminiApiKey()) {
-    console.error("Clarity.AI API misconfiguration:", { requestId, reason: "missing_gemini_api_key" });
+  const providerConfigError = getProviderConfigurationError();
+
+  if (providerConfigError) {
+    console.error("Clarity.AI API misconfiguration:", {
+      requestId,
+      provider: getConfiguredProvider(),
+      reason: providerConfigError.reason,
+    });
     sendErrorResponse(
       res,
       503,
       "service_unavailable",
-      "The backend is missing GEMINI_API_KEY. Add it to .env and restart the server.",
+      providerConfigError.message,
       requestId
     );
     return;
@@ -356,7 +368,7 @@ async function generateExplanation(request) {
 
   try {
     const primaryPrompt = buildPrompt(request);
-    const primaryResult = await requestGeminiExplanation(request, primaryPrompt);
+    const primaryResult = await requestProviderExplanation(request, primaryPrompt);
     steps.push(
       createPromptStep("primary", request.mode, primaryPrompt, primaryResult.tokenUsage, {
         explanation: primaryResult.explanation,
@@ -368,7 +380,7 @@ async function generateExplanation(request) {
     if (shouldRepairExplanation(request, explanation)) {
       try {
         const repairPrompt = buildRepairPrompt(request, explanation);
-        const repairResult = await requestGeminiExplanation(request, repairPrompt);
+        const repairResult = await requestProviderExplanation(request, repairPrompt);
         steps.push(
           createPromptStep("repair", request.mode, repairPrompt, repairResult.tokenUsage, {
             explanation: repairResult.explanation,
@@ -390,7 +402,7 @@ async function generateExplanation(request) {
     if (isUnusableExplanation(request, explanation)) {
       try {
         const rescuePrompt = buildRescuePrompt(request, explanation);
-        const rescueResult = await requestGeminiExplanation(request, rescuePrompt);
+        const rescueResult = await requestProviderExplanation(request, rescuePrompt);
         steps.push(
           createPromptStep("rescue", request.mode, rescuePrompt, rescueResult.tokenUsage, {
             explanation: rescueResult.explanation,
@@ -441,12 +453,18 @@ async function generateExplanation(request) {
   }
 }
 
+async function requestProviderExplanation(request, promptText) {
+  return getConfiguredProvider() === AI_PROVIDER_OPENAI_COMPATIBLE
+    ? requestOpenAICompatibleExplanation(request, promptText)
+    : requestGeminiExplanation(request, promptText);
+}
+
 async function requestGeminiExplanation(request, promptText) {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
   try {
-    const geminiApiKey = getGeminiApiKey();
+    const geminiApiKey = getConfiguredApiKey(process.env, AI_PROVIDER_GEMINI);
     const apiEndpoint = getGeminiApiEndpoint();
     const response = await fetch(apiEndpoint, {
       method: "POST",
@@ -509,6 +527,50 @@ async function requestGeminiExplanation(request, promptText) {
   }
 }
 
+async function requestOpenAICompatibleExplanation(request, promptText) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
+  try {
+    const response = await fetch(getOpenAICompatibleApiEndpoint(), {
+      method: "POST",
+      signal: controller.signal,
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${getConfiguredApiKey(process.env, AI_PROVIDER_OPENAI_COMPATIBLE)}`,
+      },
+      body: JSON.stringify({
+        model: getConfiguredModel(process.env, AI_PROVIDER_OPENAI_COMPATIBLE),
+        messages: [
+          {
+            role: "system",
+            content: SYSTEM_INSTRUCTION,
+          },
+          {
+            role: "user",
+            content: promptText,
+          },
+        ],
+        temperature: getTemperatureForMode(request.mode),
+        max_tokens: getMaxOutputTokensForMode(request.mode),
+      }),
+    });
+
+    const data = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      throw new Error(data?.error?.message || `OpenAI-compatible request failed with status ${response.status}.`);
+    }
+
+    return {
+      explanation: extractExplanationFromOpenAICompatible(data, request),
+      tokenUsage: extractTokenUsage(data),
+    };
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
 function createEmptyTokenUsage() {
   return {
     promptTokens: 0,
@@ -518,11 +580,15 @@ function createEmptyTokenUsage() {
 }
 
 function extractTokenUsage(data) {
-  const promptTokens = toTokenCount(data?.usageMetadata?.promptTokenCount);
+  const promptTokens = toTokenCount(data?.usageMetadata?.promptTokenCount ?? data?.usage?.prompt_tokens);
   const outputTokens = toTokenCount(
-    data?.usageMetadata?.candidatesTokenCount ?? data?.usageMetadata?.outputTokenCount
+    data?.usageMetadata?.candidatesTokenCount ??
+      data?.usageMetadata?.outputTokenCount ??
+      data?.usage?.completion_tokens
   );
-  const totalTokens = toTokenCount(data?.usageMetadata?.totalTokenCount) || promptTokens + outputTokens;
+  const totalTokens =
+    toTokenCount(data?.usageMetadata?.totalTokenCount ?? data?.usage?.total_tokens) ||
+    promptTokens + outputTokens;
 
   return {
     promptTokens,
@@ -656,7 +722,8 @@ function buildRequestMetrics(request, options = {}) {
   const rescuePrompt = explanation ? buildRescuePrompt(defaultRequest, explanation) : "";
 
   return {
-    model: getGeminiModel(),
+    provider: getConfiguredProvider(),
+    model: getConfiguredModel(),
     cached,
     usedFallback,
     error,
@@ -1629,6 +1696,80 @@ function extractExplanationFromGemini(data, request) {
   }
 
   return sanitizedExplanation;
+}
+
+function extractExplanationFromOpenAICompatible(data, request) {
+  const rawText = extractChatMessageText(data?.choices?.[0]?.message?.content);
+
+  if (!rawText) {
+    console.warn("Clarity.AI OpenAI-compatible provider returned an empty response; using fallback.", {
+      selection: request?.selection?.text || "",
+    });
+    return {
+      definition: "",
+      usage: "",
+      mode: request.mode,
+    };
+  }
+
+  const explanation = parseExplanationFromRawText(rawText);
+  const sanitizedExplanation = sanitizeGeneratedExplanation(explanation, request);
+
+  if (!sanitizedExplanation?.definition || !sanitizedExplanation?.usage) {
+    console.warn("Clarity.AI OpenAI-compatible provider returned an incomplete explanation payload.", {
+      selection: request?.selection?.text || "",
+      rawText,
+    });
+  }
+
+  return sanitizedExplanation;
+}
+
+function extractChatMessageText(content) {
+  if (typeof content === "string") {
+    return content.trim();
+  }
+
+  if (Array.isArray(content)) {
+    return content
+      .map((part) => {
+        if (typeof part === "string") {
+          return part;
+        }
+
+        if (!part || typeof part !== "object") {
+          return "";
+        }
+
+        if (typeof part.text === "string") {
+          return part.text;
+        }
+
+        if (typeof part.text?.value === "string") {
+          return part.text.value;
+        }
+
+        if (typeof part.content === "string") {
+          return part.content;
+        }
+
+        return "";
+      })
+      .join("")
+      .trim();
+  }
+
+  if (content && typeof content === "object") {
+    if (typeof content.text === "string") {
+      return content.text.trim();
+    }
+
+    if (typeof content.text?.value === "string") {
+      return content.text.value.trim();
+    }
+  }
+
+  return "";
 }
 
 function parseExplanationFromRawText(rawText) {
