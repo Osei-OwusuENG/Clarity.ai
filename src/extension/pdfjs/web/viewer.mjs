@@ -19351,15 +19351,17 @@ initCom(PDFViewerApplication);
 PDFPrintServiceFactory.initGlobals(PDFViewerApplication);
 {
   const HOSTED_VIEWER_ORIGINS = new Set(["null", "http://mozilla.github.io", "https://mozilla.github.io"]);
+  const EXTENSION_VIEWER_PROTOCOLS = new Set(["chrome-extension:", "moz-extension:", "edge-extension:"]);
   var validateFileURL = function (file) {
     if (!file) {
       return;
     }
-    const viewerOrigin = URL.parse(window.location)?.origin || "null";
-    if (HOSTED_VIEWER_ORIGINS.has(viewerOrigin)) {
+    const viewerUrl = new URL(window.location.href);
+    const viewerOrigin = viewerUrl.origin || "null";
+    if (HOSTED_VIEWER_ORIGINS.has(viewerOrigin) || EXTENSION_VIEWER_PROTOCOLS.has(viewerUrl.protocol)) {
       return;
     }
-    const fileOrigin = URL.parse(file, window.location)?.origin;
+    const fileOrigin = new URL(file, window.location.href).origin;
     if (fileOrigin === viewerOrigin) {
       return;
     }
