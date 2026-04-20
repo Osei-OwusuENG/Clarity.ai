@@ -85,11 +85,14 @@ Legacy backend envs `GEMINI_API_KEY` and `GEMINI_MODEL` are still supported for 
 - `PORT`: backend mode only; local backend port, usually `3000`
 - `ALLOWED_EXTENSION_ORIGINS`: backend mode only; optional comma-separated allowlist such as `chrome-extension://YOUR_EXTENSION_ID`
 - `CLARITY_LOG_PROMPT_METRICS`: backend mode only; optional debug flag; use `true` to enable or `false` or blank to disable
+- `CLARITY_REQUEST_TIMEOUT_MS`: backend mode only; optional timeout override in milliseconds
 
 Compatibility notes:
 
 - `GEMINI_API_KEY` and `GEMINI_MODEL` still work as Gemini fallbacks in backend mode.
 - `OPENAI_API_KEY`, `OPENAI_MODEL`, and `OPENAI_BASE_URL` are also accepted in backend mode for OpenAI-compatible setups.
+- `XAI_API_KEY`, `XAI_MODEL`, and `XAI_BASE_URL` are also accepted in backend mode for Grok or other xAI setups.
+- Grok reasoning models get a longer backend timeout by default, and `CLARITY_REQUEST_TIMEOUT_MS` can override it if needed.
 - Direct mode stores the API key in extension storage. Backend mode keeps the key on your server instead.
 
 If `ALLOWED_EXTENSION_ORIGINS` is empty, the backend accepts requests from any origin. For a tighter setup, set it to your unpacked or published extension origin, for example `chrome-extension://YOUR_EXTENSION_ID`.

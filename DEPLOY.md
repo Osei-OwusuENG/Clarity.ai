@@ -47,6 +47,16 @@ Legacy Gemini envs still work:
 - `GEMINI_API_KEY`
 - `GEMINI_MODEL`
 
+xAI aliases also work for Grok-style setups:
+
+- `XAI_API_KEY`
+- `XAI_MODEL`
+- `XAI_BASE_URL`
+
+If you use a Grok reasoning model, the backend now gives it a longer timeout by default. You can still force a specific timeout with:
+
+- `CLARITY_REQUEST_TIMEOUT_MS=120000`
+
 ## Deploy it elsewhere
 
 The backend is a small Node 18+ service. It only exposes two routes:

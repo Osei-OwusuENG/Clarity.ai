@@ -1,4 +1,5 @@
-const REQUEST_TIMEOUT_MS = 15000;
+const DEFAULT_REQUEST_TIMEOUT_MS = 15000;
+const GROK_REASONING_TIMEOUT_MS = 120000;
 const DEFAULT_MODE = "default";
 const ELI12_MODE = "eli12";
 const DEEP_MODE = "deep";
@@ -62,6 +63,25 @@ function getGeminiApiEndpoint() {
 
 function getOpenAICompatibleApiEndpoint() {
   return `${getConfiguredBaseUrl(process.env, AI_PROVIDER_OPENAI_COMPATIBLE).replace(/\/+$/, "")}/chat/completions`;
+}
+
+function getRequestTimeoutMs(provider = getConfiguredProvider(), model = getConfiguredModel()) {
+  const configuredTimeoutMs = Number(process.env.CLARITY_REQUEST_TIMEOUT_MS);
+
+  if (Number.isFinite(configuredTimeoutMs) && configuredTimeoutMs > 0) {
+    return Math.round(configuredTimeoutMs);
+  }
+
+  if (provider === AI_PROVIDER_OPENAI_COMPATIBLE && isGrokReasoningModel(model)) {
+    return GROK_REASONING_TIMEOUT_MS;
+  }
+
+  return DEFAULT_REQUEST_TIMEOUT_MS;
+}
+
+function isGrokReasoningModel(model) {
+  const normalizedModel = String(model || "").trim().toLowerCase();
+  return /^grok(?:[-.]|$)/.test(normalizedModel) && /reasoning/.test(normalizedModel);
 }
 
 function shouldLogPromptMetrics() {
@@ -461,7 +481,10 @@ async function requestProviderExplanation(request, promptText) {
 
 async function requestGeminiExplanation(request, promptText) {
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  const timeoutId = setTimeout(
+    () => controller.abort(),
+    getRequestTimeoutMs(AI_PROVIDER_GEMINI, getConfiguredModel(process.env, AI_PROVIDER_GEMINI))
+  );
 
   try {
     const geminiApiKey = getConfiguredApiKey(process.env, AI_PROVIDER_GEMINI);
@@ -529,7 +552,11 @@ async function requestGeminiExplanation(request, promptText) {
 
 async function requestOpenAICompatibleExplanation(request, promptText) {
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  const model = getConfiguredModel(process.env, AI_PROVIDER_OPENAI_COMPATIBLE);
+  const timeoutId = setTimeout(
+    () => controller.abort(),
+    getRequestTimeoutMs(AI_PROVIDER_OPENAI_COMPATIBLE, model)
+  );
 
   try {
     const response = await fetch(getOpenAICompatibleApiEndpoint(), {
@@ -540,7 +567,7 @@ async function requestOpenAICompatibleExplanation(request, promptText) {
         Authorization: `Bearer ${getConfiguredApiKey(process.env, AI_PROVIDER_OPENAI_COMPATIBLE)}`,
       },
       body: JSON.stringify({
-        model: getConfiguredModel(process.env, AI_PROVIDER_OPENAI_COMPATIBLE),
+        model,
         messages: [
           {
             role: "system",

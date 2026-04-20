@@ -27,7 +27,11 @@ function getConfiguredProvider(env = process.env) {
     return explicitProvider;
   }
 
-  if (String(env.OPENAI_API_KEY || "").trim() || normalizeBaseUrl(env.AI_BASE_URL || env.OPENAI_BASE_URL)) {
+  if (
+    String(env.OPENAI_API_KEY || "").trim() ||
+    String(env.XAI_API_KEY || "").trim() ||
+    normalizeBaseUrl(env.AI_BASE_URL || env.OPENAI_BASE_URL || env.XAI_BASE_URL)
+  ) {
     return AI_PROVIDER_OPENAI_COMPATIBLE;
   }
 
@@ -36,7 +40,7 @@ function getConfiguredProvider(env = process.env) {
 
 function getConfiguredApiKey(env = process.env, provider = getConfiguredProvider(env)) {
   if (provider === AI_PROVIDER_OPENAI_COMPATIBLE) {
-    return String(env.AI_API_KEY || env.OPENAI_API_KEY || "").trim();
+    return String(env.AI_API_KEY || env.OPENAI_API_KEY || env.XAI_API_KEY || "").trim();
   }
 
   return String(env.AI_API_KEY || env.GEMINI_API_KEY || "").trim();
@@ -44,7 +48,7 @@ function getConfiguredApiKey(env = process.env, provider = getConfiguredProvider
 
 function getConfiguredModel(env = process.env, provider = getConfiguredProvider(env)) {
   if (provider === AI_PROVIDER_OPENAI_COMPATIBLE) {
-    return normalizeModel(env.AI_MODEL || env.OPENAI_MODEL || "");
+    return normalizeModel(env.AI_MODEL || env.OPENAI_MODEL || env.XAI_MODEL || "");
   }
 
   return normalizeModel(env.AI_MODEL || env.GEMINI_MODEL || "") || DEFAULT_GEMINI_MODEL;
@@ -55,7 +59,10 @@ function getConfiguredBaseUrl(env = process.env, provider = getConfiguredProvide
     return "";
   }
 
-  return normalizeBaseUrl(env.AI_BASE_URL || env.OPENAI_BASE_URL || "") || DEFAULT_OPENAI_COMPATIBLE_BASE_URL;
+  return (
+    normalizeBaseUrl(env.AI_BASE_URL || env.OPENAI_BASE_URL || env.XAI_BASE_URL || "") ||
+    DEFAULT_OPENAI_COMPATIBLE_BASE_URL
+  );
 }
 
 function getProviderDisplayName(provider) {
@@ -84,7 +91,7 @@ function getProviderConfigurationError(env = process.env) {
       ? {
           reason: "missing_openai_compatible_api_key",
           message:
-            "The backend is missing AI_API_KEY or OPENAI_API_KEY. Add one to .env and restart the server.",
+            "The backend is missing AI_API_KEY, OPENAI_API_KEY, or XAI_API_KEY. Add one to .env and restart the server.",
         }
       : {
           reason: "missing_gemini_api_key",
@@ -98,7 +105,7 @@ function getProviderConfigurationError(env = process.env) {
     return {
       reason: "missing_ai_model",
       message:
-        "The backend is missing AI_MODEL or OPENAI_MODEL. Add an OpenAI-compatible model name and restart the server.",
+        "The backend is missing AI_MODEL, OPENAI_MODEL, or XAI_MODEL. Add an OpenAI-compatible model name and restart the server.",
     };
   }
 
