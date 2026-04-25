@@ -1136,7 +1136,7 @@ function normalizePopupErrorMessage(message) {
   }
 
   if (
-    /select some text first|shorter highlight|shorter selection|busy right now|try again later|could not connect|could not generate an explanation|backend url|base url|gemini_api_key|ai_api_key|openai_api_key|ai_model|openai_model|rejected the extension origin|health check|server is running|backend is missing|provider is not configured|api key|model name|openai-compatible|switch to backend mode|internet connection/i.test(
+    /select some text first|shorter highlight|shorter selection|busy right now|try again later|could not connect|could not generate an explanation|backend url|base url|gemini_api_key|ai_api_key|openai_api_key|xai|grok|ai_model|openai_model|rejected the extension origin|health check|server is running|backend is missing|provider is not configured|api key|model name|openai-compatible|switch to backend mode|internet connection/i.test(
       normalizedMessage
     )
   ) {
@@ -1147,7 +1147,7 @@ function normalizePopupErrorMessage(message) {
 }
 
 function isSetupMessage(message) {
-  return /backend url|base url|gemini_api_key|ai_api_key|openai_api_key|ai_model|openai_model|openai-compatible|rejected the extension origin|server is running|backend is missing|provider is not configured|api key|model name|switch to backend mode/i.test(
+  return /backend url|base url|gemini_api_key|ai_api_key|openai_api_key|xai|grok|ai_model|openai_model|openai-compatible|rejected the extension origin|server is running|backend is missing|provider is not configured|api key|model name|switch to backend mode/i.test(
     String(message || "")
   );
 }

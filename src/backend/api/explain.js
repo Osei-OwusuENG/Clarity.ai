@@ -19,12 +19,12 @@ const SYSTEM_INSTRUCTION = [
 
 const {
   AI_PROVIDER_GEMINI,
-  AI_PROVIDER_OPENAI_COMPATIBLE,
   getConfiguredApiKey,
   getConfiguredBaseUrl,
   getConfiguredModel,
   getConfiguredProvider,
   getProviderConfigurationError,
+  isOpenAICompatibleProvider,
 } = require("./provider-config");
 
 function createRequestId() {
@@ -62,7 +62,7 @@ function getGeminiApiEndpoint() {
 }
 
 function getOpenAICompatibleApiEndpoint() {
-  return `${getConfiguredBaseUrl(process.env, AI_PROVIDER_OPENAI_COMPATIBLE).replace(/\/+$/, "")}/chat/completions`;
+  return `${getConfiguredBaseUrl(process.env, getConfiguredProvider()).replace(/\/+$/, "")}/chat/completions`;
 }
 
 function getRequestTimeoutMs(provider = getConfiguredProvider(), model = getConfiguredModel()) {
@@ -72,7 +72,7 @@ function getRequestTimeoutMs(provider = getConfiguredProvider(), model = getConf
     return Math.round(configuredTimeoutMs);
   }
 
-  if (provider === AI_PROVIDER_OPENAI_COMPATIBLE && isGrokReasoningModel(model)) {
+  if (isOpenAICompatibleProvider(provider) && isGrokReasoningModel(model)) {
     return GROK_REASONING_TIMEOUT_MS;
   }
 
@@ -474,7 +474,7 @@ async function generateExplanation(request) {
 }
 
 async function requestProviderExplanation(request, promptText) {
-  return getConfiguredProvider() === AI_PROVIDER_OPENAI_COMPATIBLE
+  return isOpenAICompatibleProvider(getConfiguredProvider())
     ? requestOpenAICompatibleExplanation(request, promptText)
     : requestGeminiExplanation(request, promptText);
 }
@@ -552,10 +552,11 @@ async function requestGeminiExplanation(request, promptText) {
 
 async function requestOpenAICompatibleExplanation(request, promptText) {
   const controller = new AbortController();
-  const model = getConfiguredModel(process.env, AI_PROVIDER_OPENAI_COMPATIBLE);
+  const provider = getConfiguredProvider();
+  const model = getConfiguredModel(process.env, provider);
   const timeoutId = setTimeout(
     () => controller.abort(),
-    getRequestTimeoutMs(AI_PROVIDER_OPENAI_COMPATIBLE, model)
+    getRequestTimeoutMs(provider, model)
   );
 
   try {
@@ -564,7 +565,7 @@ async function requestOpenAICompatibleExplanation(request, promptText) {
       signal: controller.signal,
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${getConfiguredApiKey(process.env, AI_PROVIDER_OPENAI_COMPATIBLE)}`,
+        Authorization: `Bearer ${getConfiguredApiKey(process.env, provider)}`,
       },
       body: JSON.stringify({
         model,

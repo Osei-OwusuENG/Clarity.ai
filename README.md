@@ -2,7 +2,7 @@
 
 Clarity.AI is an open-source browser extension for understanding what you read without breaking flow.
 
-Highlight a word, phrase, or passage, press your shortcut, and get a clear explanation in context. Direct mode works inside the extension with your own API key, and you can choose either Google Gemini or any OpenAI-compatible API. A self-hosted backend is still available if you prefer to keep keys out of the extension.
+Highlight a word, phrase, or passage, press your shortcut, and get a clear explanation in context. Direct mode works inside the extension with your own API key, and you can choose Google Gemini, xAI/Grok, or any OpenAI-compatible API. A self-hosted backend is still available if you prefer to keep keys out of the extension.
 
 ![Clarity.AI explaining highlighted text in context](images/clarity-ai-screenshot.jpeg)
 
@@ -12,7 +12,7 @@ First public version.
 
 - In-place explanations instead of tab switching
 - Context-aware responses that use nearby page content
-- Direct mode with Gemini or OpenAI-compatible APIs
+- Direct mode with Gemini, xAI/Grok, or OpenAI-compatible APIs
 - Optional self-hosted backend for users who prefer keeping keys out of the extension
 - Open-source codebase with no fixed hosted dependency
 
@@ -39,10 +39,10 @@ First public version.
 1. Load the extension.
 2. Open the extension settings.
 3. Keep `Direct mode` selected unless you want to use a backend.
-4. Choose `Google Gemini` or `OpenAI-compatible`.
+4. Choose `Google Gemini`, `xAI / Grok`, or `OpenAI-compatible`.
 5. Add your API key.
 6. Add a model name.
-7. If you chose `OpenAI-compatible`, also add the provider base URL.
+7. If you chose `xAI / Grok`, Clarity.AI uses `https://api.x.ai/v1` by default. If you chose `OpenAI-compatible`, add the provider base URL.
 8. Save.
 9. Highlight text on any page and trigger Clarity.AI with your configured shortcut.
 
@@ -51,7 +51,7 @@ First public version.
 If you prefer not to store the API key in the extension, Clarity.AI can also talk to a self-hosted backend from this repo:
 
 1. Copy `.env.example` to `.env`.
-2. Set `AI_PROVIDER=gemini` or `AI_PROVIDER=openai-compatible`.
+2. Set `AI_PROVIDER=gemini`, `AI_PROVIDER=xai`, or `AI_PROVIDER=openai-compatible`.
 3. Add `AI_API_KEY`.
 4. Add `AI_MODEL` if your provider needs an explicit model name.
 5. If you chose `openai-compatible`, set `AI_BASE_URL`.
@@ -78,7 +78,7 @@ Legacy backend envs `GEMINI_API_KEY` and `GEMINI_MODEL` are still supported for 
 
 ## Configuration
 
-- `AI_PROVIDER`: backend mode only; `gemini` or `openai-compatible`
+- `AI_PROVIDER`: backend mode only; `gemini`, `xai`, or `openai-compatible`
 - `AI_API_KEY`: backend mode only; provider API key
 - `AI_MODEL`: backend mode only; provider model name
 - `AI_BASE_URL`: backend mode only; base URL for OpenAI-compatible providers

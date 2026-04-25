@@ -13,6 +13,10 @@ Use the backend only if you want the API key to live on a server instead of insi
 
    or
 
+   `AI_PROVIDER=xai`
+
+   or
+
    `AI_PROVIDER=openai-compatible`
 
 3. Add your API key:
@@ -23,7 +27,7 @@ Use the backend only if you want the API key to live on a server instead of insi
 
    `AI_MODEL=your_provider_model`
 
-5. If you chose `openai-compatible`, also add a base URL:
+5. If you chose `xai`, the default base URL is `https://api.x.ai/v1`. If you chose `openai-compatible`, also add a base URL:
 
    `AI_BASE_URL=https://api.openai.com/v1`
 

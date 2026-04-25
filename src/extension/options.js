@@ -5,10 +5,16 @@ const VALID_SHORTCUT_MODIFIERS = new Set(["none", "alt", "ctrl", "meta", "shift"
 
 const DIRECT_PROVIDER_GEMINI = "gemini";
 const DIRECT_PROVIDER_OPENAI_COMPATIBLE = "openai-compatible";
-const VALID_DIRECT_PROVIDERS = new Set([DIRECT_PROVIDER_GEMINI, DIRECT_PROVIDER_OPENAI_COMPATIBLE]);
+const DIRECT_PROVIDER_XAI = "xai";
+const VALID_DIRECT_PROVIDERS = new Set([
+  DIRECT_PROVIDER_GEMINI,
+  DIRECT_PROVIDER_OPENAI_COMPATIBLE,
+  DIRECT_PROVIDER_XAI,
+]);
 
 const DEFAULT_DIRECT_GEMINI_MODEL = "gemini-2.5-flash";
 const DEFAULT_DIRECT_OPENAI_COMPATIBLE_BASE_URL = "https://api.openai.com/v1";
+const DEFAULT_DIRECT_XAI_BASE_URL = "https://api.x.ai/v1";
 
 const SYNC_STORAGE_KEYS = {
   connectionMode: "connectionMode",
@@ -68,20 +74,33 @@ directProviderSelect.addEventListener("change", () => {
     normalizeDirectProvider(directProviderSelect.dataset.currentProvider) || DEFAULT_SETTINGS.directProvider;
   const nextProvider = normalizeDirectProvider(directProviderSelect.value) || DEFAULT_SETTINGS.directProvider;
   const currentModel = normalizeDirectModel(directModelInput.value);
+  const currentBaseUrl = normalizeDirectBaseUrl(directBaseUrlInput.value);
 
   if (!currentModel || currentModel === getDefaultDirectModel(previousProvider)) {
     directModelInput.value = getDefaultDirectModel(nextProvider);
   }
 
   if (
-    nextProvider === DIRECT_PROVIDER_OPENAI_COMPATIBLE &&
-    !normalizeDirectBaseUrl(directBaseUrlInput.value)
+    isOpenAICompatibleDirectProvider(nextProvider) &&
+    (!currentBaseUrl || currentBaseUrl === getDefaultDirectBaseUrl(previousProvider))
   ) {
-    directBaseUrlInput.value = DEFAULT_DIRECT_OPENAI_COMPATIBLE_BASE_URL;
+    directBaseUrlInput.value = getDefaultDirectBaseUrl(nextProvider);
   }
 
   directProviderSelect.dataset.currentProvider = nextProvider;
   updateConnectionModeUI();
+});
+
+directModelInput.addEventListener("input", () => {
+  const currentProvider = normalizeDirectProvider(directProviderSelect.value) || DEFAULT_SETTINGS.directProvider;
+  const currentModel = normalizeDirectModel(directModelInput.value);
+
+  if (currentProvider === DIRECT_PROVIDER_GEMINI && isGrokDirectModel(currentModel)) {
+    directProviderSelect.value = DIRECT_PROVIDER_XAI;
+    directProviderSelect.dataset.currentProvider = DIRECT_PROVIDER_XAI;
+    directBaseUrlInput.value = DEFAULT_DIRECT_XAI_BASE_URL;
+    updateConnectionModeUI();
+  }
 });
 
 toggleApiKeyVisibilityButton.addEventListener("click", () => {
@@ -222,7 +241,9 @@ function resolveStoredDirectValues(syncValues, localValues) {
   const directApiKey = normalizeApiKey(localValues[LOCAL_STORAGE_KEYS.directApiKey]);
   const hasModernDirectSettings = Boolean(directProvider || directModel || directBaseUrl || directApiKey);
 
-  const resolvedProvider = hasModernDirectSettings ? directProvider || DEFAULT_SETTINGS.directProvider : DIRECT_PROVIDER_GEMINI;
+  const resolvedProvider = hasModernDirectSettings
+    ? resolveDirectProvider(directProvider || DEFAULT_SETTINGS.directProvider, directModel, directBaseUrl)
+    : DIRECT_PROVIDER_GEMINI;
   const fallbackLegacyModel = !hasModernDirectSettings
     ? normalizeDirectModel(syncValues[SYNC_STORAGE_KEYS.legacyDirectGeminiModel])
     : "";
@@ -234,15 +255,22 @@ function resolveStoredDirectValues(syncValues, localValues) {
     directProvider: resolvedProvider,
     directApiKey: directApiKey || fallbackLegacyApiKey,
     directModel: directModel || fallbackLegacyModel || getDefaultDirectModel(resolvedProvider),
-    directBaseUrl: directBaseUrl || DEFAULT_SETTINGS.directBaseUrl,
+    directBaseUrl: directBaseUrl || getDefaultDirectBaseUrl(resolvedProvider),
   };
 }
 
 function getSettingsFromForm() {
-  const directProvider = normalizeDirectProvider(directProviderSelect.value) || DEFAULT_SETTINGS.directProvider;
+  const selectedDirectProvider = normalizeDirectProvider(directProviderSelect.value) || DEFAULT_SETTINGS.directProvider;
   const directApiKey = normalizeApiKey(directApiKeyInput.value);
-  const directModel = normalizeDirectModel(directModelInput.value) || getDefaultDirectModel(directProvider);
-  const directBaseUrl = normalizeDirectBaseUrl(directBaseUrlInput.value) || DEFAULT_SETTINGS.directBaseUrl;
+  const normalizedDirectModel = normalizeDirectModel(directModelInput.value);
+  const normalizedDirectBaseUrl = normalizeDirectBaseUrl(directBaseUrlInput.value);
+  const directProvider = resolveDirectProvider(
+    selectedDirectProvider,
+    normalizedDirectModel,
+    normalizedDirectBaseUrl
+  );
+  const directModel = normalizedDirectModel || getDefaultDirectModel(directProvider);
+  const directBaseUrl = normalizedDirectBaseUrl || getDefaultDirectBaseUrl(directProvider);
   const backendBaseUrl = normalizeBackendBaseUrl(backendBaseUrlInput.value);
   const explicitMode = normalizeConnectionMode(connectionModeSelect.value);
 
@@ -296,15 +324,22 @@ function updateConnectionModeUI() {
 
 function updateDirectProviderUI() {
   const directProvider = normalizeDirectProvider(directProviderSelect.value) || DEFAULT_SETTINGS.directProvider;
-  const isOpenAICompatible = directProvider === DIRECT_PROVIDER_OPENAI_COMPATIBLE;
+  const usesOpenAICompatibleTransport = isOpenAICompatibleDirectProvider(directProvider);
 
-  directBaseUrlField.hidden = !isOpenAICompatible;
-  directApiKeyInput.placeholder = directProvider === DIRECT_PROVIDER_GEMINI ? "AIza..." : "sk-...";
-  directModelInput.placeholder =
-    directProvider === DIRECT_PROVIDER_GEMINI ? DEFAULT_DIRECT_GEMINI_MODEL : "your-provider-model";
-  directProviderHelp.textContent = isOpenAICompatible
-    ? "OpenAI-compatible mode sends POST /chat/completions requests to the base URL below."
-    : "Gemini mode uses Google's native Gemini API directly from the extension.";
+  directBaseUrlField.hidden = !usesOpenAICompatibleTransport;
+  directApiKeyInput.placeholder = getDirectApiKeyPlaceholder(directProvider);
+  directModelInput.placeholder = getDirectModelPlaceholder(directProvider);
+
+  if (directProvider === DIRECT_PROVIDER_XAI) {
+    directProviderHelp.textContent =
+      "xAI / Grok mode sends OpenAI-compatible chat completions requests to xAI.";
+    return;
+  }
+
+  directProviderHelp.textContent =
+    directProvider === DIRECT_PROVIDER_OPENAI_COMPATIBLE
+      ? "OpenAI-compatible mode sends POST /chat/completions requests to the base URL below."
+      : "Gemini mode uses Google's native Gemini API directly from the extension.";
 }
 
 function updateShortcutPreview() {
@@ -330,20 +365,20 @@ function validateSettings(settings) {
 
     if (!settings.directModel) {
       return {
-        message:
-          settings.directProvider === DIRECT_PROVIDER_OPENAI_COMPATIBLE
-            ? "Add an OpenAI-compatible model name."
-            : "Add a Gemini model name such as gemini-2.5-flash.",
+        message: getDirectModelValidationMessage(settings.directProvider),
         focusTarget: directModelInput,
       };
     }
 
     if (
-      settings.directProvider === DIRECT_PROVIDER_OPENAI_COMPATIBLE &&
+      isOpenAICompatibleDirectProvider(settings.directProvider) &&
       !settings.directBaseUrl
     ) {
       return {
-        message: "Add a base URL such as https://api.openai.com/v1.",
+        message:
+          settings.directProvider === DIRECT_PROVIDER_XAI
+            ? "Add the xAI base URL, https://api.x.ai/v1."
+            : "Add a base URL such as https://api.openai.com/v1.",
         focusTarget: directBaseUrlInput,
       };
     }
@@ -366,6 +401,10 @@ function formatConnectionModeLabel(connectionMode) {
 }
 
 function formatDirectProviderLabel(directProvider) {
+  if (directProvider === DIRECT_PROVIDER_XAI) {
+    return "xAI / Grok";
+  }
+
   return directProvider === DIRECT_PROVIDER_OPENAI_COMPATIBLE ? "OpenAI-compatible" : "Gemini";
 }
 
@@ -389,6 +428,54 @@ function formatShortcutLabel(shortcut) {
 
 function getDefaultDirectModel(directProvider) {
   return directProvider === DIRECT_PROVIDER_GEMINI ? DEFAULT_DIRECT_GEMINI_MODEL : "";
+}
+
+function getDefaultDirectBaseUrl(directProvider) {
+  return directProvider === DIRECT_PROVIDER_XAI
+    ? DEFAULT_DIRECT_XAI_BASE_URL
+    : DEFAULT_DIRECT_OPENAI_COMPATIBLE_BASE_URL;
+}
+
+function isOpenAICompatibleDirectProvider(directProvider) {
+  return directProvider === DIRECT_PROVIDER_OPENAI_COMPATIBLE || directProvider === DIRECT_PROVIDER_XAI;
+}
+
+function isGrokDirectModel(model) {
+  return /^grok(?:[-.]|$)/i.test(String(model || "").trim());
+}
+
+function isXaiBaseUrl(baseUrl) {
+  try {
+    return new URL(baseUrl).hostname.toLowerCase() === "api.x.ai";
+  } catch (error) {
+    return false;
+  }
+}
+
+function getDirectApiKeyPlaceholder(directProvider) {
+  if (directProvider === DIRECT_PROVIDER_GEMINI) {
+    return "AIza...";
+  }
+
+  return directProvider === DIRECT_PROVIDER_XAI ? "xai-..." : "sk-...";
+}
+
+function getDirectModelPlaceholder(directProvider) {
+  if (directProvider === DIRECT_PROVIDER_GEMINI) {
+    return DEFAULT_DIRECT_GEMINI_MODEL;
+  }
+
+  return directProvider === DIRECT_PROVIDER_XAI ? "grok-4" : "your-provider-model";
+}
+
+function getDirectModelValidationMessage(directProvider) {
+  if (directProvider === DIRECT_PROVIDER_XAI) {
+    return "Add a Grok model name.";
+  }
+
+  return directProvider === DIRECT_PROVIDER_OPENAI_COMPATIBLE
+    ? "Add an OpenAI-compatible model name."
+    : "Add a Gemini model name such as gemini-2.5-flash.";
 }
 
 function resolveConnectionMode(explicitMode, directApiKey, backendBaseUrl) {
@@ -415,6 +502,36 @@ function normalizeConnectionMode(value) {
 function normalizeDirectProvider(value) {
   const normalizedValue = String(value || "").trim().toLowerCase();
   return VALID_DIRECT_PROVIDERS.has(normalizedValue) ? normalizedValue : "";
+}
+
+function resolveDirectProvider(value, model, baseUrl) {
+  const directProvider = normalizeDirectProvider(value);
+  const directModel = normalizeDirectModel(model);
+  const directBaseUrl = normalizeDirectBaseUrl(baseUrl);
+
+  if (directProvider === DIRECT_PROVIDER_XAI) {
+    return DIRECT_PROVIDER_XAI;
+  }
+
+  if (isGrokDirectModel(directModel)) {
+    if (
+      !directProvider ||
+      directProvider === DIRECT_PROVIDER_GEMINI ||
+      (directProvider === DIRECT_PROVIDER_OPENAI_COMPATIBLE &&
+        (!directBaseUrl || directBaseUrl === DEFAULT_DIRECT_OPENAI_COMPATIBLE_BASE_URL))
+    ) {
+      return DIRECT_PROVIDER_XAI;
+    }
+  }
+
+  if (
+    isXaiBaseUrl(directBaseUrl) &&
+    (!directProvider || directProvider === DIRECT_PROVIDER_OPENAI_COMPATIBLE)
+  ) {
+    return DIRECT_PROVIDER_XAI;
+  }
+
+  return directProvider || DEFAULT_SETTINGS.directProvider;
 }
 
 function normalizeBackendBaseUrl(value) {
